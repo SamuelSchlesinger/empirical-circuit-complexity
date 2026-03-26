@@ -1,0 +1,580 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  keywordstyle=\color{blue!70!black},
+  commentstyle=\color{green!50!black},
+  breaklines=true,
+  frame=single,
+  xleftmargin=1em,
+  framexleftmargin=0.5em,
+  columns=fullflexible,
+  % Code shown with ASCII syntax; actual source uses Unicode equivalents.
+}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\Bool}{\{0,1\}}
+\newcommand{\Sn}{S_n}
+\newcommand{\Ztwo}{\mathbb{Z}_2}
+\newcommand{\CC}{\mathsf{C}}
+
+\title{Empirical Circuit Complexity:\\
+  Formal Proofs for Small Boolean Functions}
+\author{Samuel Schlesinger}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe a research program to determine the exact circuit complexity of
+every Boolean function $\Bool^n \to \Bool$ for small~$n$, with all results
+formally verified in Lean~4. Our circuit model uses fan-in~2 AND gates with
+free negation on wires. We exploit NPN equivalence---input permutation, input
+negation, output negation---to reduce the proof burden by orders of magnitude:
+from 65{,}536 functions at $n=4$ down to 222 representatives. The proofs are
+written by AI within a trust architecture where Lean's type checker is the sole
+arbiter of correctness.
+\end{abstract}
+
+\section{Introduction}
+
+Circuit complexity---the minimum number of gates needed to compute a Boolean
+function---is among the most fundamental measures in computational complexity
+theory. Despite decades of effort, proving superlinear circuit lower bounds for
+explicit functions remains one of the great open
+problems~\cite{razborov, arora-barak}.
+
+The asymptotic theory has produced deep structural results: Lupanov's upper
+bound showing almost all functions require $\sim 2^n/n$
+gates~\cite{lupanov}, and the Shannon counting argument~\cite{shannon} showing
+most functions are hard. For small~$n$, exact circuit complexities have been
+determined computationally, notably in Knuth's exhaustive
+treatment~\cite{knuth-4a}. But these results are computational artifacts, not
+proofs: they are outputs of programs that could, in principle, contain bugs.
+
+This paper describes a program to produce \emph{formal proofs} of the exact
+circuit complexity of every Boolean function on a small number of inputs. For
+$n$ input bits, there are $2^{2^n}$ Boolean functions. The circuit complexity
+of each is a natural number, and we prove it correct---both by exhibiting an
+optimal circuit and by ruling out all smaller ones---as a machine-checked
+theorem in Lean~4.
+
+Three aspects are worth noting:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Formal verification.} Every result is a theorem that Lean's type
+  checker has accepted. If any claim is wrong, the project does not compile.
+
+\item \textbf{Symmetry exploitation.} We formally prove that circuit
+  complexity is invariant under the NPN equivalence group, reducing the number
+  of independent proofs by up to $295\times$ at $n=4$.
+
+\item \textbf{AI-assisted proof generation.} The proof terms are written by
+  large language models within a trust architecture that confines the AI to
+  supplying evidence. Incorrect proofs are rejected by the type checker. This
+  enables scale without sacrificing rigor.
+\end{enumerate}
+
+Our initial target is $n = 1$ through $n = 4$: 242 representative proofs
+covering all 65{,}812 Boolean functions. Beyond the database itself, we are
+interested in the structural questions it surfaces: what is the distribution of
+circuit complexities? How do optimal circuits and lower bound arguments change
+as $n$ grows?
+
+The source code is available at
+\url{https://github.com/sschlesinger/empirical-circuit-complexity}.\footnote{%
+Repository URL subject to change; the project may move or be renamed.}
+
+\section{Circuit Model}
+
+\begin{definition}
+A \emph{Boolean circuit} with $n$ inputs and $k$ gates is a sequence of $k$
+fan-in~2 AND gates in topological order, together with a designated output
+wire. Each wire reference (gate input or circuit output) consists of a wire
+index and a \emph{negation bit}; when the negation bit is set, the signal on
+the wire is inverted. The \emph{size} of the circuit is $k$, the number of AND
+gates.
+\end{definition}
+
+\begin{definition}
+The \emph{circuit complexity} of a Boolean function $f : \Bool^n \to \Bool$,
+written $\CC(f)$, is the minimum $k$ such that some circuit of size $k$
+computes~$f$.
+\end{definition}
+
+Formally, a circuit is a pair $(\mathbf{g}, r)$ where $\mathbf{g}$ is a
+\texttt{GateList}---an inductively defined sequence of gates, each referencing
+only earlier wires---and $r$ is a \texttt{Ref} (a wire index with negation bit)
+designating the output. Gate~$i$ can reference any of the $n + i$ available
+wires: $n$ inputs plus $i$ preceding gate outputs.
+
+The formalization is self-contained: it uses Lean~4 with no external
+dependencies (no Mathlib or other libraries). This is a deliberate choice to
+keep the trusted base minimal, though we may reconsider as the proofs grow more
+complex.
+
+\paragraph{Why this basis.} The AND/NOT basis is functionally complete.
+Treating NOT as a zero-cost wire annotation reflects the standard convention
+that negation is ``free''~\cite{arora-barak}. This model is equivalent to
+counting \{AND, OR\} gates when both are available, since
+$\text{OR}(a,b) = \lnot\text{AND}(\lnot a, \lnot b)$ by De~Morgan's law.
+
+\paragraph{Constants cost one gate.} There are no free constant wires. The
+cheapest way to produce a constant output is $\text{AND}(x, \lnot x) =
+\mathsf{false}$ (one gate), optionally negated for $\mathsf{true}$.
+
+\section{Trust Architecture}
+
+A central design goal is a sharp trust boundary between \emph{what is claimed}
+and \emph{who generates the evidence}. For each input size $n$, three kinds of
+files are produced:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Definitions} (\texttt{Defs}): Generated by a human-reviewed
+  Python program. Each Boolean function is encoded as a Lean~4 function
+  \texttt{(Fin $n$ → Bool) → Bool} via a nested if-then-else tree matching
+  its truth table.
+
+\item \textbf{Proofs}: Written by AI. Contains proof terms: upper bounds
+  (exhibiting circuits) and lower bounds (ruling out smaller circuits). These
+  are the only files not produced by the trusted generator.
+
+\item \textbf{Statements}: Generated by the same trusted program. Imports
+  both Definitions and Proofs and states the circuit complexity theorems,
+  drawing proof terms from the Proofs module.
+\end{enumerate}
+
+The trust model is: we trust the generator (which we review) and Lean's type
+checker. The AI is \emph{untrusted}---it may hallucinate circuits, miscalculate
+complexities, or produce invalid proof terms. Any such error causes the
+Statements file to fail type-checking. Lean's module system enforces this
+boundary: the Statements file imports the Proofs file and requires that the
+exported terms have the correct types.
+
+For each representative function, the proof file must export:
+\begin{itemize}[leftmargin=*]
+\item \texttt{f\_\{idx\}\_size : Nat} --- the claimed circuit complexity $k$,
+\item \texttt{f\_\{idx\}\_upper : HasCircuitOfSize f $k$} --- a
+  witness circuit of size $k$,
+\item \texttt{f\_\{idx\}\_lower : $\forall$ j, j < $k$ $\to$ $\lnot$ HasCircuitOfSize f $j$}
+  --- a proof that no smaller circuit suffices.
+\end{itemize}
+
+\section{Symmetry Exploitation}
+\label{sec:symmetry}
+
+Several transformations on circuits are \emph{free}: they change which function
+is computed without changing the number of gates. We identify three such
+transformations and formally prove that each preserves circuit complexity.
+
+\subsection{Three free transformations}
+
+Write $f^\sigma$ for the function $x \mapsto f(x_{\sigma(0)}, \ldots,
+x_{\sigma(n-1)})$, i.e., $f$ with inputs permuted by $\sigma$.
+Write $f^{\oplus i}$ for the function obtained by negating input~$i$:
+$x \mapsto f(x_0, \ldots, \lnot x_i, \ldots, x_{n-1})$.
+
+\begin{theorem}[Input permutation invariance]
+For any $\sigma \in \Sn$,\; $\CC(f^\sigma) = \CC(f)$.
+\end{theorem}
+\noindent\textit{Proof idea.} Relabel each input wire reference $i \mapsto
+\sigma(i)$. No gates are added or removed.
+
+\begin{theorem}[Input negation invariance]
+For any input index $i$,\; $\CC(f^{\oplus i}) = \CC(f)$.
+\end{theorem}
+\noindent\textit{Proof idea.} Flip the negation bit on every reference to input
+wire $i$. No gates are added or removed.
+
+\begin{theorem}[Output negation invariance]
+$\CC(\lnot f) = \CC(f)$.
+\end{theorem}
+\noindent\textit{Proof idea.} Flip the negation bit on the output wire. No
+gates are added or removed.
+
+\medskip
+All three theorems and their converses are stated and proved in Lean~4 in our
+\texttt{Circuits/Basic.lean} module. The output negation proof is complete. The
+input permutation and input negation proofs depend on evaluation lemmas
+(showing that the modified circuit evaluates to the expected function) whose
+inductive proofs over the dependent gate list type are stated but deferred; the
+complexity invariance theorems are proved assuming these lemmas.
+
+\subsection{NPN equivalence}
+
+These three operations generate a group known in logic synthesis as the
+\emph{NPN equivalence group}~\cite{npn-corrected}:
+\[
+  G = (\Sn \ltimes \Ztwo^n) \times \Ztwo,
+\]
+of order $2^{n+1} \cdot n!$, where $\Sn$ acts on $\Ztwo^n$ by permuting
+coordinates. Two functions are NPN-equivalent if and only if one can be obtained
+from the other by permuting inputs, negating inputs, and negating the output.
+The NPN class counts form OEIS sequence A000370~\cite{oeis-a000370}.
+
+\begin{remark}
+NPN equivalence is the maximal equivalence relation on Boolean functions
+preservable by free wire operations in this model. The argument is
+straightforward: the only operations that preserve gate count are changes to
+wire indices and negation bits. On input wires, index changes yield $\Sn$ and
+negation bit changes yield $\Ztwo^n$; on the output wire, negation bit changes
+yield the final $\Ztwo$ factor. Any other input transformation---for instance,
+replacing $x_i$ with $x_i \oplus x_j$---requires computing a new function of
+two wires, which costs at least one gate.
+\end{remark}
+
+\subsection{Counting representatives via Burnside's lemma}
+
+The number of NPN equivalence classes is computed by Burnside's lemma:
+\[
+  |X / G| = \frac{1}{|G|} \sum_{g \in G} |\mathrm{Fix}(g)|.
+\]
+Each group element $g = (\sigma, \varepsilon, \delta)$ induces a permutation
+$\pi$ on the $2^n$ input indices: $\pi(j)$ is obtained by permuting the bits of
+$j$ according to $\sigma$ and then XORing with $\varepsilon$. A truth table is
+fixed by $g$ if and only if $f(j) = f(\pi(j)) \oplus \delta$ for every input
+index~$j$.
+
+When $\delta = 0$, the truth table must be constant on each cycle of $\pi$,
+giving $2^{c(\pi)}$ fixed points where $c(\pi)$ is the number of cycles.
+When $\delta = 1$, values must alternate around each cycle:
+$f(j) \neq f(\pi(j))$. Following this constraint around a cycle of length~$L$,
+we find $f(j) = f(\pi^L(j)) \oplus (L \bmod 2) = f(j) \oplus (L \bmod 2)$.
+If $L$ is odd this forces $f(j) \neq f(j)$, a contradiction, so all cycles
+must have even length; when they do, there are $2^{c(\pi)}$ fixed points.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+$n$ & Functions & $|G|$ & Representatives & Reduction \\
+\midrule
+1 & 4 & 4 & 2 & $2\times$ \\
+2 & 16 & 16 & 4 & $4\times$ \\
+3 & 256 & 96 & 14 & $18\times$ \\
+4 & 65{,}536 & 768 & 222 & $295\times$ \\
+5 & ${\sim}4.3 \times 10^9$ & 7{,}680 & 616{,}126 & $6{,}971\times$ \\
+6 & ${\sim}1.8 \times 10^{19}$ & 92{,}160 & ${\sim}2.0 \times 10^{14}$ & $92{,}117\times$ \\
+7 & ${\sim}3.4 \times 10^{38}$ & 1{,}290{,}240 & ${\sim}2.6 \times 10^{32}$ & $1{,}290{,}240\times$ \\
+\bottomrule
+\end{tabular}
+\caption{NPN equivalence class counts. For large $n$, the reduction factor
+  approaches $|G|$, indicating almost all functions have trivial stabilizer.}
+\label{tab:reps}
+\end{table}
+
+At $n = 4$, proving complexity for 222 representatives covers all 65{,}536
+functions. For $n \le 4$, only $2 + 4 + 14 + 222 = 242$ independent proofs are
+needed.
+
+\section{Proof Techniques}
+
+Two kinds of proofs are required for each function: an upper bound (exhibit a
+circuit) and a lower bound (rule out all smaller circuits).
+
+\subsection{Upper bounds}
+
+An upper bound constructs a concrete circuit and proves it computes the target
+function. The proof obligation is
+$\forall\, x,\; \texttt{eval}(c, x) = f(x)$.
+Because both the circuit and the function definition are fully concrete, Lean's
+\texttt{simp} tactic---given the evaluation definitions---reduces both sides to
+identical Boolean expressions and closes the goal automatically.
+
+\subsection{Lower bounds}
+
+Lower bound proofs show that no circuit of size less than $k$ computes~$f$.
+This requires universal quantification over all circuits of each smaller size.
+Several patterns emerge at small~$n$:
+
+\paragraph{Vacuous.} When $\CC(f) = 0$, the lower bound
+$\forall\, j < 0, \ldots$ is vacuously true.
+
+\paragraph{Ruling out size 0.} A size-0 circuit is just a (possibly negated)
+input wire. A general lemma handles all constant functions: evaluating on the
+all-true and all-false inputs, a size-0 circuit must return different values,
+but a constant function returns the same value. Contradiction. For non-constant,
+non-literal functions, the proof case-splits on which input wire and negation
+bit, providing a counterexample input for each case.
+
+\paragraph{Ruling out size $\ge 1$.} The proof must enumerate all possible
+gate configurations. For a single gate, there are $(2n)^2$ choices for the gate
+inputs (each of $n$ wires with a negation bit, two inputs) and $2(n+1)$
+choices for the output reference. The proof destructures the circuit,
+case-splits on all choices, and provides counterexample inputs. For size~$\ge 2$,
+the enumeration grows combinatorially.
+
+\subsection{Example: constant false on one input}
+
+To illustrate the proof structure, consider $f_0$ on $n = 1$: the
+constant-false function. Its complexity is~1.
+
+\paragraph{Upper bound.} We exhibit the circuit
+$\text{AND}(x_0, \lnot x_0)$ with output referencing the gate (non-negated):
+
+\begin{lstlisting}
+def f_0_upper : HasCircuitOfSize f_0 1 :=
+  ({gates := .cons .nil {lhs := {index := (0 : Fin 2),
+                                  negated := false},
+                          rhs := {index := (0 : Fin 2),
+                                  negated := true}},
+    output := {index := (1 : Fin 2), negated := false}},
+   fun input => by
+     simp [Circuit.eval, Ref.eval, GateList.eval,
+           Gate.eval, extendEnv, f_0])
+\end{lstlisting}
+
+The anonymous constructor provides the circuit term; \texttt{simp} verifies
+that evaluating it on any input produces $\mathsf{false}$, matching $f_0$.
+
+\paragraph{Lower bound.} We must show no size-0 circuit computes $f_0$. Since
+$f_0(\mathbf{1}) = f_0(\mathbf{0}) = \mathsf{false}$, the general constant
+lemma applies directly:
+
+\begin{lstlisting}
+def f_0_lower :
+    forall j, j < 1 -> Not (HasCircuitOfSize f_0 j) := by
+  intro j hj
+  have : j = 0 := by omega
+  subst this
+  exact no_size0_of_constant (by simp [f_0])
+\end{lstlisting}
+
+\noindent The \texttt{omega} tactic establishes $j = 0$; then
+the general lemma rules out size~0.
+
+\begin{remark}
+A recurring implementation concern: Lean's \texttt{simp} tactic diverges when
+applied to circuit evaluation terms containing free Boolean variables (e.g., an
+unresolved negation bit). The workaround is to case-split on all Boolean
+parameters \emph{before} invoking \texttt{simp}.
+\end{remark}
+
+\section{Results}
+
+\subsection{Completed: $n = 1$}
+
+All 4 functions (2 NPN representatives) have been formally verified:
+
+\begin{center}
+\begin{tabular}{@{}clcl@{}}
+\toprule
+Index & Function & $\CC$ & Witness \\
+\midrule
+0 & constant $0$ & 1 & $\text{AND}(x_0, \lnot x_0)$ \\
+1 & $\lnot x_0$ & 0 & wire with negation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The two non-representatives are $x_0$ (output negation of $\lnot x_0$) and
+constant~$1$ (output negation of constant~$0$).
+
+\subsection{Expected: $n = 2$}
+
+The 16 functions reduce to 4 NPN representatives. Formal proofs are in
+progress; the expected complexities (matching Knuth's computed
+values~\cite{knuth-4a}) are:
+
+\begin{center}
+\begin{tabular}{@{}clcl@{}}
+\toprule
+Index & Function & $\CC$ (expected) & Witness \\
+\midrule
+0 & constant $0$ & 1 & $\text{AND}(x_0, \lnot x_0)$ \\
+1 & $\lnot x_0 \land \lnot x_1$ & 1 & $\text{AND}(\lnot x_0, \lnot x_1)$ \\
+3 & $\lnot x_1$ & 0 & wire with negation \\
+6 & $x_0 \oplus x_1$ & 3 & see below \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The XOR function is notable: it requires 3 AND gates, making it the most
+expensive 2-input function. One optimal circuit computes it as
+$\lnot(\lnot(x_0 \land \lnot x_1) \land \lnot(\lnot x_0 \land x_1))$:
+the two inner gates compute the ``half-XORs'' $x_0 \land \lnot x_1$ and
+$\lnot x_0 \land x_1$, and the outer gate takes their NOR and negates.
+The lower bound proof---ruling out all circuits of sizes 0, 1, and 2---will
+require significant case analysis.
+
+\subsection{Baseline observations}
+
+At $n = 1$, the results establish baseline behavior for the cost model:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Negation is free in practice.} The literal $\lnot x_0$ has
+  complexity~0. This confirms the model: NOT is a wire annotation, not a gate.
+
+\item \textbf{Constants are not free.} With no constant wires available,
+  producing a constant costs one gate ($x \land \lnot x$). This is a
+  consequence of the model choice and sets the floor for all non-literal
+  functions.
+
+\item \textbf{NPN reduction is effective.} Even at $n = 1$, the four functions
+  collapse to two classes. At $n = 2$, 16 functions collapse to 4 classes. At
+  $n = 4$, the $295\times$ reduction makes the project feasible.
+\end{itemize}
+
+\noindent These are not surprises---they follow directly from the
+definitions---but they validate that the formal model behaves as intended before
+we scale to larger~$n$ where the results are no longer obvious.
+
+\section{Related Work}
+
+\paragraph{Exact circuit complexity.}
+Knuth~\cite{knuth-4a} gives an extensive computational treatment of circuit
+complexity for small Boolean functions, including exhaustive search for
+optimal circuits and tables of exact values. Our work produces the same
+values but as formally verified theorems rather than computational outputs. The
+formal proofs also serve a different purpose: they are explicit, inspectable
+objects from which proof strategies can be extracted and analyzed.
+
+\paragraph{NPN classification.}
+NPN equivalence is a standard tool in logic synthesis for reducing the space of
+Boolean functions~\cite{npn-corrected}. The class counts (OEIS
+A000370~\cite{oeis-a000370}) have been tabulated for $n$ up to at least~6. We
+apply this classification not for synthesis but to reduce the number of formal
+proofs required.
+
+\paragraph{Formal verification of combinatorics.}
+The use of proof assistants for large combinatorial results has precedent: the
+Flyspeck project~\cite{flyspeck} (Kepler conjecture), the Four Color
+Theorem formalization~\cite{four-color}, and various results in Lean's
+Mathlib~\cite{mathlib}. Our work is distinguished by its focus on circuit
+complexity and its use of AI-generated proof terms within a minimal trusted base.
+
+\paragraph{AI-assisted theorem proving.}
+Recent work has shown the potential of large language models for formal proof
+generation~\cite{llm-lean}. Our trust architecture is designed to exploit this:
+the AI generates candidate proof terms, and the type checker accepts or rejects
+them. The human role is limited to reviewing the trusted generator and
+evaluating the proof strategies that emerge.
+
+\section{Open Questions}
+
+The systematic, verified nature of this effort surfaces several concrete
+questions that we intend to investigate as the database grows.
+
+\paragraph{Complexity distribution.} What is the distribution of $\CC(f)$ over
+NPN representatives at each~$n$? How does the maximum complexity grow? The
+Lupanov bound gives $\max_f \CC(f) \le (1 + o(1)) \cdot 2^n / n$
+asymptotically~\cite{lupanov}; our data will provide exact values for
+small~$n$.
+
+\paragraph{Structure of hard functions.} Which NPN classes have the highest
+complexity? Do they share structural features? XOR is the hardest function at
+$n = 2$; what are its counterparts at $n = 3$ and $n = 4$?
+
+\paragraph{Lower bound composition.} Can lower bound proofs be composed
+inductively across levels of~$n$? Shannon decomposition---fixing one variable
+and reducing to two $(n{-}1)$-input subfunctions---is a natural strategy. Our
+formal framework supports cross-size imports, enabling proofs at level~$n$ to
+cite verified results from level~$n - 1$.
+
+\paragraph{Automation frontier.} At $n = 4$ (222 representatives), AI-assisted
+proof generation is feasible with per-function interaction. At $n = 5$
+(616{,}126 representatives), it requires genuine automation: batch proof search
+guided by patterns from smaller~$n$. Upper bounds are likely automatable (search
+for circuits); lower bounds are the bottleneck.
+
+\paragraph{Extracting proof structure.} Every formal proof is an explicit term
+available for inspection. The counterexample inputs used in lower bound proofs,
+the circuit topologies that appear in optimal solutions, and the case-analysis
+patterns that close goals are all concrete data. Systematically mining this
+data may reveal structure invisible to the asymptotic theory.
+
+\section{Conclusion}
+
+We have described a research program to determine the exact circuit complexity
+of all Boolean functions for small~$n$, with formal verification in Lean~4 as
+the standard of correctness. The NPN symmetry group reduces the proof burden by
+orders of magnitude, from 65{,}812 functions to 242 representatives for $n \le
+4$. An AI-assisted workflow generates proof candidates that the type checker
+verifies independently, enabling scale without sacrificing rigor.
+
+The $n = 1$ case is complete; $n = 2$ through $n = 4$ are in progress. As the
+verified database grows, we expect it to serve as a testbed for questions about
+circuit complexity---one where every claimed fact is machine-checked and every
+proof term is available for inspection.
+
+\begin{thebibliography}{99}
+
+\bibitem{razborov}
+  A.~A.~Razborov, S.~Rudich,
+  ``Natural proofs,''
+  \textit{J.~Comput.~Syst.~Sci.}, 55(1):24--35, 1997.
+
+\bibitem{arora-barak}
+  S.~Arora, B.~Barak,
+  \textit{Computational Complexity: A Modern Approach},
+  Cambridge University Press, 2009.
+
+\bibitem{lupanov}
+  O.~B.~Lupanov,
+  ``On the synthesis of contact networks''
+  (\textit{O sinteze kontaktnykh skhem}),
+  \textit{Dokl.~Akad.~Nauk SSSR}, 119(1):23--26, 1958.
+
+\bibitem{shannon}
+  C.~E.~Shannon,
+  ``The synthesis of two-terminal switching circuits,''
+  \textit{Bell Syst.~Tech.~J.}, 28(1):59--98, 1949.
+
+\bibitem{knuth-4a}
+  D.~E.~Knuth,
+  \textit{The Art of Computer Programming}, Vol.~4A:
+  \textit{Combinatorial Algorithms, Part 1},
+  Addison-Wesley, 2011.
+  See Section~7.1.2.
+
+\bibitem{npn-corrected}
+  D.~Debnath, T.~Sasao,
+  ``Efficient computation of canonical form for Boolean matching in
+  large libraries,''
+  \textit{Proc.~ASP-DAC}, 2004.
+
+\bibitem{oeis-a000370}
+  OEIS Foundation,
+  ``A000370: Number of NPN-equivalence classes of Boolean functions of $n$
+  variables,''
+  \url{https://oeis.org/A000370}.
+
+\bibitem{flyspeck}
+  T.~Hales et~al.,
+  ``A formal proof of the Kepler conjecture,''
+  \textit{Forum Math.~Pi}, 5:e2, 2017.
+
+\bibitem{four-color}
+  G.~Gonthier,
+  ``Formal proof---the four-color theorem,''
+  \textit{Notices AMS}, 55(11):1382--1393, 2008.
+
+\bibitem{mathlib}
+  The mathlib Community,
+  ``The Lean mathematical library,''
+  \textit{Proc.~CPP}, 2020.
+
+\bibitem{llm-lean}
+  K.~Yang et~al.,
+  ``LeanDojo: Theorem proving with retrieval-augmented language models and
+  data extraction from Lean 4,''
+  \textit{NeurIPS}, 2023.
+
+\end{thebibliography}
+
+\end{document}

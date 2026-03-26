@@ -1,0 +1,15 @@
+name = "Circuits"
+version = "0.1.0"
+defaultTargets = ["Circuits"]
+
+[[lean_lib]]
+name = "Circuits"
+
+[[lean_lib]]
+name = "Size1"
+
+[[lean_lib]]
+name = "Size2"
+
+[[lean_lib]]
+name = "Size3"
