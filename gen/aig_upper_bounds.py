@@ -486,62 +486,52 @@ def make_circuit_with_constants(n, lean_gates, output_ref):
     return num_gates, format_circuit(n, num_gates, all_gates, adjusted_output)
 
 
-def format_ref(wire_idx, negated, bound):
-    """Format a Lean Ref term: ⟨⟨wire_idx, by omega⟩, negated⟩"""
+def format_ref(wire_idx, negated):
+    """Format a Lean Ref term using the mkRef smart constructor."""
     neg_str = "true" if negated else "false"
-    return f"⟨⟨{wire_idx}, by omega⟩, {neg_str}⟩"
+    return f"mkRef {wire_idx} {neg_str}"
+
+
+def format_lit(wire_idx, negated):
+    """Format a wire literal inside `gates![...]`: `i` or `¬i`."""
+    return f"\u00ac{wire_idx}" if negated else f"{wire_idx}"
 
 
 def format_circuit(n, num_gates, gates, output_ref):
-    """Format a complete Lean Circuit term: ⟨gate_list, output_ref⟩"""
-    # Build gate list from inside out: .nil, then .cons ... for each gate
-    gate_list = ".nil"
-    for i, (ref0, ref1) in enumerate(gates):
-        bound = n + i
-        r0 = format_ref(ref0[0], ref0[1], bound)
-        r1 = format_ref(ref1[0], ref1[1], bound)
-        gate_term = f"⟨{r0}, {r1}⟩"
-        if i == 0:
-            gate_list = f".cons .nil {gate_term}"
-        else:
-            gate_list = f".cons ({gate_list}) {gate_term}"
+    """Format a complete Lean Circuit term: ⟨gates![...], mkRef ...⟩.
 
-    out = format_ref(output_ref[0], output_ref[1], n + num_gates)
-    return f"⟨{gate_list}, {out}⟩"
+    Each gate is rendered as `lit ∧ lit`. If there are at most 4 gates the
+    list is on one line; otherwise each gate goes on its own line, aligned
+    with the first character after `gates![`.
+    """
+    gate_strs = [
+        f"{format_lit(r0[0], r0[1])} \u2227 {format_lit(r1[0], r1[1])}"
+        for r0, r1 in gates
+    ]
+    out = format_ref(output_ref[0], output_ref[1])
+
+    if len(gate_strs) <= 4:
+        body = ", ".join(gate_strs)
+        return f"\u27e8gates![{body}], {out}\u27e9"
+    else:
+        # Indent matches the column after `gates![` in the standard layout
+        # `  ⟨⟨gates![` (2 spaces + 2 ⟨ + 7 chars `gates![`) → column 11.
+        indent = " " * 11
+        body = (",\n" + indent).join(gate_strs)
+        return f"\u27e8gates![{body}], {out}\u27e9"
 
 
 def gen_lean_upper_bound(n, batch, func_idx, num_gates, circuit_term):
     """Generate Lean definitions for one function's upper bound."""
     ns = f"Size{n}.Defs{batch}"
     lines = []
-    lines.append(f"-- f_{func_idx}: truth table 0x{func_idx:x} — size {num_gates}")
+    lines.append(f"-- f_{func_idx}: truth table 0x{func_idx:x} \u2014 size {num_gates}")
     lines.append(f"")
     lines.append(f"def f_{func_idx}_size : Nat := {num_gates}")
     lines.append(f"")
     lines.append(f"def f_{func_idx}_upper : HasCircuitOfSize {ns}.f_{func_idx} {num_gates} :=")
-    lines.append(f"  ⟨{circuit_term},")
-
-    # Build the proof tactic:
-    # 1) Provide Nat.add reduction lemmas so dite conditions in extendEnv resolve
-    # 2) simp to unfold circuit evaluation
-    # 3) bv_decide to close the Boolean equality
-    tactic_parts = []
-    have_names = []
-    for i in range(num_gates):
-        name = f"h{i}"
-        have_names.append(name)
-        tactic_parts.append(f"     have {name} : Nat.add {n} {i} = {n + i} := rfl")
-    simp_args = ", ".join(have_names)
-    if simp_args:
-        simp_args += ", "
-    simp_args += "Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv"
-    simp_args += f", {ns}.f_{func_idx}"
-    tactic_parts.append(f"     simp only [{simp_args}]")
-    tactic_parts.append(f"     bv_decide")
-
-    lines.append(f"   fun input => by")
-    lines.extend(tactic_parts)
-    lines.append(f"  ⟩")
+    lines.append(f"  \u27e8{circuit_term},")
+    lines.append(f"   by circuit_eval\u27e9")
     return "\n".join(lines)
 
 

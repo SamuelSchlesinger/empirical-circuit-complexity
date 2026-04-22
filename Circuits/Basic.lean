@@ -4,6 +4,8 @@
   A circuit is a DAG of fan-in 2 AND gates, where each wire can be
   optionally negated at zero cost. Circuit size = number of AND gates.
 -/
+import Std.Tactic.BVDecide
+import Lean.Elab.Tactic
 
 namespace Circuits
 
@@ -216,5 +218,86 @@ theorem no_size0_of_constant {n : Nat} {f : (Fin n → Bool) → Bool}
     cases neg <;> {
       simp [Circuit.eval, Ref.eval, GateList.eval] at h₁ h₂
       simp_all }
+
+-- ============================================================
+-- Concrete-circuit construction & evaluation helpers
+-- ============================================================
+
+/-- Smart constructor for a wire reference at a concrete index.
+    The bound proof is auto-discharged by `omega`. -/
+abbrev mkRef {b : Nat} (i : Nat) (neg : Bool) (h : i < b := by omega) : Ref b :=
+  ⟨⟨i, h⟩, neg⟩
+
+/-- Smart constructor for an AND gate from two concrete index/negation pairs.
+    Both bound proofs are auto-discharged by `omega`. -/
+abbrev mkGate {b : Nat} (li : Nat) (ln : Bool) (ri : Nat) (rn : Bool)
+    (hl : li < b := by omega) (hr : ri < b := by omega) : Gate b :=
+  ⟨⟨⟨li, hl⟩, ln⟩, ⟨⟨ri, hr⟩, rn⟩⟩
+
+/-- A literal wire reference inside `gates![...]`: either `i` (positive) or
+    `¬i` / `!i` (negated). -/
+declare_syntax_cat circLit
+syntax num : circLit
+syntax "¬" num : circLit
+syntax "!" num : circLit
+
+/-- Internal helpers that extract the index / negation bit from a `circLit`. -/
+syntax "circLit_idx%" circLit : term
+syntax "circLit_neg%" circLit : term
+
+macro_rules
+  | `(circLit_idx% $n:num)   => `($n)
+  | `(circLit_idx% ¬ $n:num) => `($n)
+  | `(circLit_neg% $_:num)   => `(false)
+  | `(circLit_neg% ¬ $_:num) => `(true)
+
+/-- A single AND gate written as `lit ∧ lit`. -/
+syntax circAnd := circLit " ∧ " circLit
+
+/-- List-style notation for building a `GateList`.
+    Each gate is written as `lit ∧ lit`, where each literal is either `i`
+    or `¬i` (negated wire). Gates appear in execution (topological) order:
+    `gates![g₀, g₁, g₂]` expands to `((.nil.cons g₀).cons g₁).cons g₂`.
+
+    Example: `gates![¬1 ∧ 0, ¬3 ∧ 2]` builds two gates `AND(¬x₁, x₀)` and
+    `AND(¬w₃, w₂)` (where `w₃` is the previous gate's output). -/
+syntax "gates![" circAnd,* "]" : term
+macro_rules
+  | `(gates![ $[$as ∧ $bs],* ]) => do
+      let mut acc ← `(GateList.nil)
+      for (a, b) in as.zip bs do
+        acc ← `(GateList.cons $acc
+                  (mkGate (circLit_idx% $a) (circLit_neg% $a)
+                          (circLit_idx% $b) (circLit_neg% $b)))
+      return acc
+
+/-- Tactic for proving `c.eval input = f input` for a concrete circuit `c`
+    and a concrete function `f`. Unfolds circuit evaluation, normalizes
+    the `Nat.add n k` bounds that arise from the dependent `GateList` index,
+    and discharges the remaining Boolean equation with `bv_decide`.
+
+    By default, the head constant of the goal's right-hand side is used as
+    the function definition to unfold. Use `circuit_eval Foo.f_idx` to
+    override (e.g. when the RHS is not headed by a constant). -/
+syntax "circuit_eval" (ppSpace term)? : tactic
+
+elab_rules : tactic
+  | `(tactic| circuit_eval $[$override?]?) => do
+      Lean.Elab.Tactic.evalTactic
+        (← `(tactic| (try unfold Circuit.computes); intros))
+      let fStx : Lean.Term ← match override? with
+        | some t => pure t
+        | none => do
+            let goal ← Lean.Elab.Tactic.getMainTarget
+            let some (_, _, rhs) := goal.eq?
+              | Lean.throwError "circuit_eval: goal is not an equality"
+            let some fname := rhs.getAppFn.constName?
+              | Lean.throwError "circuit_eval: RHS is not headed by a constant"
+            pure ⟨Lean.mkIdent fname⟩
+      Lean.Elab.Tactic.evalTactic (← `(tactic| (
+          simp only [Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv,
+                     show ∀ a b : Nat, Nat.add a b = a + b from fun _ _ => rfl,
+                     $fStx:term]
+          bv_decide)))
 
 end Circuits

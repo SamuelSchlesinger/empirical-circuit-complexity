@@ -11,12 +11,8 @@ open Circuits
 def f_0_size : Nat := 1
 
 def f_0_upper : HasCircuitOfSize Size3.Defs0.f_0 1 :=
-  ⟨⟨.cons .nil ⟨⟨⟨0, by omega⟩, false⟩, ⟨⟨0, by omega⟩, true⟩⟩, ⟨⟨3, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     simp only [h0, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_0]
-     bv_decide
-  ⟩
+  ⟨⟨gates![0 ∧ ¬0], mkRef 3 false⟩,
+   by circuit_eval⟩
 
 def f_0_lower : ∀ j, j < 1 → ¬HasCircuitOfSize Size3.Defs0.f_0 j := by
   sorry
@@ -26,13 +22,8 @@ def f_0_lower : ∀ j, j < 1 → ¬HasCircuitOfSize Size3.Defs0.f_0 j := by
 def f_1_size : Nat := 2
 
 def f_1_upper : HasCircuitOfSize Size3.Defs0.f_1 2 :=
-  ⟨⟨.cons (.cons .nil ⟨⟨⟨1, by omega⟩, true⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨3, by omega⟩, false⟩, ⟨⟨2, by omega⟩, true⟩⟩, ⟨⟨4, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     simp only [h0, h1, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_1]
-     bv_decide
-  ⟩
+  ⟨⟨gates![¬1 ∧ ¬0, 3 ∧ ¬2], mkRef 4 false⟩,
+   by circuit_eval⟩
 
 def f_1_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_1 j := by
   sorry
@@ -42,12 +33,8 @@ def f_1_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_1 j := by
 def f_3_size : Nat := 1
 
 def f_3_upper : HasCircuitOfSize Size3.Defs0.f_3 1 :=
-  ⟨⟨.cons .nil ⟨⟨⟨2, by omega⟩, true⟩, ⟨⟨1, by omega⟩, true⟩⟩, ⟨⟨3, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     simp only [h0, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_3]
-     bv_decide
-  ⟩
+  ⟨⟨gates![¬2 ∧ ¬1], mkRef 3 false⟩,
+   by circuit_eval⟩
 
 def f_3_lower : ∀ j, j < 1 → ¬HasCircuitOfSize Size3.Defs0.f_3 j := by
   sorry
@@ -57,15 +44,8 @@ def f_3_lower : ∀ j, j < 1 → ¬HasCircuitOfSize Size3.Defs0.f_3 j := by
 def f_6_size : Nat := 4
 
 def f_6_upper : HasCircuitOfSize Size3.Defs0.f_6 4 :=
-  ⟨⟨.cons (.cons (.cons (.cons .nil ⟨⟨⟨1, by omega⟩, true⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨1, by omega⟩, false⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨4, by omega⟩, true⟩, ⟨⟨3, by omega⟩, true⟩⟩) ⟨⟨⟨5, by omega⟩, true⟩, ⟨⟨2, by omega⟩, true⟩⟩, ⟨⟨6, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     have h3 : Nat.add 3 3 = 6 := rfl
-     simp only [h0, h1, h2, h3, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_6]
-     bv_decide
-  ⟩
+  ⟨⟨gates![¬1 ∧ 0, 1 ∧ ¬0, ¬4 ∧ ¬3, ¬5 ∧ ¬2], mkRef 6 false⟩,
+   by circuit_eval⟩
 
 def f_6_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_6 j := by
   sorry
@@ -75,13 +55,8 @@ def f_6_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_6 j := by
 def f_7_size : Nat := 2
 
 def f_7_upper : HasCircuitOfSize Size3.Defs0.f_7 2 :=
-  ⟨⟨.cons (.cons .nil ⟨⟨⟨1, by omega⟩, false⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨3, by omega⟩, true⟩, ⟨⟨2, by omega⟩, true⟩⟩, ⟨⟨4, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     simp only [h0, h1, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_7]
-     bv_decide
-  ⟩
+  ⟨⟨gates![1 ∧ 0, ¬3 ∧ ¬2], mkRef 4 false⟩,
+   by circuit_eval⟩
 
 def f_7_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_7 j := by
   sorry
@@ -91,11 +66,8 @@ def f_7_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_7 j := by
 def f_15_size : Nat := 0
 
 def f_15_upper : HasCircuitOfSize Size3.Defs0.f_15 0 :=
-  ⟨⟨.nil, ⟨⟨2, by omega⟩, true⟩⟩,
-   fun input => by
-     simp only [Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_15]
-     bv_decide
-  ⟩
+  ⟨⟨gates![], mkRef 2 true⟩,
+   by circuit_eval⟩
 
 def f_15_lower : ∀ j, j < 0 → ¬HasCircuitOfSize Size3.Defs0.f_15 j := by
   sorry
@@ -105,17 +77,13 @@ def f_15_lower : ∀ j, j < 0 → ¬HasCircuitOfSize Size3.Defs0.f_15 j := by
 def f_22_size : Nat := 6
 
 def f_22_upper : HasCircuitOfSize Size3.Defs0.f_22 6 :=
-  ⟨⟨.cons (.cons (.cons (.cons (.cons (.cons .nil ⟨⟨⟨2, by omega⟩, false⟩, ⟨⟨1, by omega⟩, false⟩⟩) ⟨⟨⟨2, by omega⟩, true⟩, ⟨⟨1, by omega⟩, true⟩⟩) ⟨⟨⟨3, by omega⟩, true⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨5, by omega⟩, false⟩, ⟨⟨4, by omega⟩, true⟩⟩) ⟨⟨⟨4, by omega⟩, false⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨7, by omega⟩, true⟩, ⟨⟨6, by omega⟩, true⟩⟩, ⟨⟨8, by omega⟩, true⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     have h3 : Nat.add 3 3 = 6 := rfl
-     have h4 : Nat.add 3 4 = 7 := rfl
-     have h5 : Nat.add 3 5 = 8 := rfl
-     simp only [h0, h1, h2, h3, h4, h5, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_22]
-     bv_decide
-  ⟩
+  ⟨⟨gates![2 ∧ 1,
+           ¬2 ∧ ¬1,
+           ¬3 ∧ ¬0,
+           5 ∧ ¬4,
+           4 ∧ 0,
+           ¬7 ∧ ¬6], mkRef 8 true⟩,
+   by circuit_eval⟩
 
 def f_22_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_22 j := by
   sorry
@@ -125,15 +93,8 @@ def f_22_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_22 j := by
 def f_23_size : Nat := 4
 
 def f_23_upper : HasCircuitOfSize Size3.Defs0.f_23 4 :=
-  ⟨⟨.cons (.cons (.cons (.cons .nil ⟨⟨⟨2, by omega⟩, false⟩, ⟨⟨1, by omega⟩, false⟩⟩) ⟨⟨⟨2, by omega⟩, true⟩, ⟨⟨1, by omega⟩, true⟩⟩) ⟨⟨⟨4, by omega⟩, true⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨5, by omega⟩, true⟩, ⟨⟨3, by omega⟩, true⟩⟩, ⟨⟨6, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     have h3 : Nat.add 3 3 = 6 := rfl
-     simp only [h0, h1, h2, h3, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_23]
-     bv_decide
-  ⟩
+  ⟨⟨gates![2 ∧ 1, ¬2 ∧ ¬1, ¬4 ∧ 0, ¬5 ∧ ¬3], mkRef 6 false⟩,
+   by circuit_eval⟩
 
 def f_23_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_23 j := by
   sorry
@@ -143,16 +104,12 @@ def f_23_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_23 j := by
 def f_24_size : Nat := 5
 
 def f_24_upper : HasCircuitOfSize Size3.Defs0.f_24 5 :=
-  ⟨⟨.cons (.cons (.cons (.cons (.cons .nil ⟨⟨⟨1, by omega⟩, false⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨3, by omega⟩, false⟩, ⟨⟨2, by omega⟩, true⟩⟩) ⟨⟨⟨1, by omega⟩, true⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨5, by omega⟩, false⟩, ⟨⟨2, by omega⟩, false⟩⟩) ⟨⟨⟨6, by omega⟩, true⟩, ⟨⟨4, by omega⟩, true⟩⟩, ⟨⟨7, by omega⟩, true⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     have h3 : Nat.add 3 3 = 6 := rfl
-     have h4 : Nat.add 3 4 = 7 := rfl
-     simp only [h0, h1, h2, h3, h4, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_24]
-     bv_decide
-  ⟩
+  ⟨⟨gates![1 ∧ 0,
+           3 ∧ ¬2,
+           ¬1 ∧ ¬0,
+           5 ∧ 2,
+           ¬6 ∧ ¬4], mkRef 7 true⟩,
+   by circuit_eval⟩
 
 def f_24_lower : ∀ j, j < 5 → ¬HasCircuitOfSize Size3.Defs0.f_24 j := by
   sorry
@@ -162,15 +119,8 @@ def f_24_lower : ∀ j, j < 5 → ¬HasCircuitOfSize Size3.Defs0.f_24 j := by
 def f_25_size : Nat := 4
 
 def f_25_upper : HasCircuitOfSize Size3.Defs0.f_25 4 :=
-  ⟨⟨.cons (.cons (.cons (.cons .nil ⟨⟨⟨1, by omega⟩, false⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨3, by omega⟩, false⟩, ⟨⟨2, by omega⟩, true⟩⟩) ⟨⟨⟨1, by omega⟩, true⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨5, by omega⟩, true⟩, ⟨⟨4, by omega⟩, true⟩⟩, ⟨⟨6, by omega⟩, true⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     have h3 : Nat.add 3 3 = 6 := rfl
-     simp only [h0, h1, h2, h3, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_25]
-     bv_decide
-  ⟩
+  ⟨⟨gates![1 ∧ 0, 3 ∧ ¬2, ¬1 ∧ ¬0, ¬5 ∧ ¬4], mkRef 6 true⟩,
+   by circuit_eval⟩
 
 def f_25_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_25 j := by
   sorry
@@ -180,14 +130,8 @@ def f_25_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_25 j := by
 def f_27_size : Nat := 3
 
 def f_27_upper : HasCircuitOfSize Size3.Defs0.f_27 3 :=
-  ⟨⟨.cons (.cons (.cons .nil ⟨⟨⟨2, by omega⟩, false⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨1, by omega⟩, false⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨4, by omega⟩, true⟩, ⟨⟨3, by omega⟩, true⟩⟩, ⟨⟨5, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     simp only [h0, h1, h2, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_27]
-     bv_decide
-  ⟩
+  ⟨⟨gates![2 ∧ 0, 1 ∧ ¬0, ¬4 ∧ ¬3], mkRef 5 false⟩,
+   by circuit_eval⟩
 
 def f_27_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size3.Defs0.f_27 j := by
   sorry
@@ -197,15 +141,8 @@ def f_27_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size3.Defs0.f_27 j := by
 def f_30_size : Nat := 4
 
 def f_30_upper : HasCircuitOfSize Size3.Defs0.f_30 4 :=
-  ⟨⟨.cons (.cons (.cons (.cons .nil ⟨⟨⟨1, by omega⟩, true⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨3, by omega⟩, true⟩, ⟨⟨2, by omega⟩, false⟩⟩) ⟨⟨⟨3, by omega⟩, false⟩, ⟨⟨2, by omega⟩, true⟩⟩) ⟨⟨⟨5, by omega⟩, true⟩, ⟨⟨4, by omega⟩, true⟩⟩, ⟨⟨6, by omega⟩, false⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     have h3 : Nat.add 3 3 = 6 := rfl
-     simp only [h0, h1, h2, h3, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_30]
-     bv_decide
-  ⟩
+  ⟨⟨gates![¬1 ∧ ¬0, ¬3 ∧ 2, 3 ∧ ¬2, ¬5 ∧ ¬4], mkRef 6 false⟩,
+   by circuit_eval⟩
 
 def f_30_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_30 j := by
   sorry
@@ -215,14 +152,8 @@ def f_30_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_30 j := by
 def f_60_size : Nat := 3
 
 def f_60_upper : HasCircuitOfSize Size3.Defs0.f_60 3 :=
-  ⟨⟨.cons (.cons (.cons .nil ⟨⟨⟨2, by omega⟩, true⟩, ⟨⟨1, by omega⟩, false⟩⟩) ⟨⟨⟨2, by omega⟩, false⟩, ⟨⟨1, by omega⟩, true⟩⟩) ⟨⟨⟨4, by omega⟩, true⟩, ⟨⟨3, by omega⟩, true⟩⟩, ⟨⟨5, by omega⟩, true⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     simp only [h0, h1, h2, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_60]
-     bv_decide
-  ⟩
+  ⟨⟨gates![¬2 ∧ 1, 2 ∧ ¬1, ¬4 ∧ ¬3], mkRef 5 true⟩,
+   by circuit_eval⟩
 
 def f_60_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size3.Defs0.f_60 j := by
   sorry
@@ -232,17 +163,13 @@ def f_60_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size3.Defs0.f_60 j := by
 def f_105_size : Nat := 6
 
 def f_105_upper : HasCircuitOfSize Size3.Defs0.f_105 6 :=
-  ⟨⟨.cons (.cons (.cons (.cons (.cons (.cons .nil ⟨⟨⟨2, by omega⟩, true⟩, ⟨⟨1, by omega⟩, true⟩⟩) ⟨⟨⟨2, by omega⟩, false⟩, ⟨⟨1, by omega⟩, false⟩⟩) ⟨⟨⟨4, by omega⟩, true⟩, ⟨⟨3, by omega⟩, true⟩⟩) ⟨⟨⟨5, by omega⟩, false⟩, ⟨⟨0, by omega⟩, false⟩⟩) ⟨⟨⟨5, by omega⟩, true⟩, ⟨⟨0, by omega⟩, true⟩⟩) ⟨⟨⟨7, by omega⟩, true⟩, ⟨⟨6, by omega⟩, true⟩⟩, ⟨⟨8, by omega⟩, true⟩⟩,
-   fun input => by
-     have h0 : Nat.add 3 0 = 3 := rfl
-     have h1 : Nat.add 3 1 = 4 := rfl
-     have h2 : Nat.add 3 2 = 5 := rfl
-     have h3 : Nat.add 3 3 = 6 := rfl
-     have h4 : Nat.add 3 4 = 7 := rfl
-     have h5 : Nat.add 3 5 = 8 := rfl
-     simp only [h0, h1, h2, h3, h4, h5, Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv, Size3.Defs0.f_105]
-     bv_decide
-  ⟩
+  ⟨⟨gates![¬2 ∧ ¬1,
+           2 ∧ 1,
+           ¬4 ∧ ¬3,
+           5 ∧ 0,
+           ¬5 ∧ ¬0,
+           ¬7 ∧ ¬6], mkRef 8 true⟩,
+   by circuit_eval⟩
 
 def f_105_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_105 j := by
   sorry
