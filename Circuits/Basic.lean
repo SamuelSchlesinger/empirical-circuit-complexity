@@ -4,6 +4,8 @@
   A circuit is a DAG of fan-in 2 AND gates, where each wire can be
   optionally negated at zero cost. Circuit size = number of AND gates.
 -/
+import Std.Tactic.BVDecide
+import Lean.Elab.Tactic
 
 namespace Circuits
 
@@ -216,5 +218,164 @@ theorem no_size0_of_constant {n : Nat} {f : (Fin n → Bool) → Bool}
     cases neg <;> {
       simp [Circuit.eval, Ref.eval, GateList.eval] at h₁ h₂
       simp_all }
+
+-- ============================================================
+-- Decidability of `∀ x : Fin n → Bool, p x` for small n
+-- ============================================================
+
+/-- Cons a Boolean value at the head of a `Fin n → Bool` family. -/
+def consFn {n : Nat} (b : Bool) (y : Fin n → Bool) : Fin (n+1) → Bool :=
+  fun i => if h : i.val = 0 then b else y ⟨i.val - 1, by have := i.isLt; omega⟩
+
+/-- Bool-valued universal quantification over `Fin n → Bool`, by enumeration. -/
+def allBool : ∀ (n : Nat), ((Fin n → Bool) → Bool) → Bool
+  | 0, f => f Fin.elim0
+  | n+1, f =>
+      allBool n (fun y => f (consFn false y)) &&
+      allBool n (fun y => f (consFn true y))
+
+theorem consFn_eta {n : Nat} (x : Fin (n+1) → Bool) :
+    consFn (x 0) (fun i => x ⟨i.val + 1, by omega⟩) = x := by
+  funext i
+  unfold consFn
+  by_cases h : i.val = 0
+  · rw [dif_pos h]; congr 1; exact Fin.ext h.symm
+  · rw [dif_neg h]; show x _ = x _
+    congr 1; apply Fin.ext
+    show i.val - 1 + 1 = i.val
+    omega
+
+theorem allBool_eq_true : ∀ (n : Nat) (f : (Fin n → Bool) → Bool),
+    allBool n f = true ↔ ∀ x, f x = true
+  | 0, f => by
+    refine ⟨?_, fun h => h _⟩
+    intro h x
+    have : x = Fin.elim0 := funext (fun i => i.elim0)
+    exact this ▸ h
+  | n+1, f => by
+    simp only [allBool, Bool.and_eq_true]
+    rw [allBool_eq_true n, allBool_eq_true n]
+    refine ⟨?_, fun h => ⟨fun y => h _, fun y => h _⟩⟩
+    rintro ⟨hf, ht⟩ x
+    rw [← consFn_eta x]
+    cases x 0
+    · exact hf _
+    · exact ht _
+
+/-- Decidability of universally-quantified Boolean predicates over input
+    assignments. Together with `decide`, this lets us check small-`n`
+    circuit-complexity claims by enumerating all `2^n` input assignments. -/
+instance decForallFinBool {n : Nat} (p : (Fin n → Bool) → Prop) [DecidablePred p] :
+    Decidable (∀ x : Fin n → Bool, p x) :=
+  decidable_of_iff (allBool n (fun x => decide (p x)) = true) <| by
+    rw [allBool_eq_true]
+    refine ⟨fun h x => ?_, fun h x => ?_⟩
+    · exact of_decide_eq_true (h x)
+    · exact decide_eq_true (h x)
+
+/-- A size-0 circuit is just an output wire reference (possibly negated)
+    pointing at one of the inputs. So a function has a size-0 circuit iff
+    it equals (a possibly negated copy of) some input wire.
+
+    Combined with the `decForallFinBool` instance above, this rewrite
+    reduces a goal of the form `¬ HasCircuitOfSize f 0` (for a concrete
+    `f` on small `n`) to a fully decidable statement that `decide` closes. -/
+theorem hasSize0_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
+    HasCircuitOfSize f 0 ↔
+      ∃ (idx : Fin n) (neg : Bool),
+        ∀ x, f x = (if neg then !x idx else x idx) := by
+  constructor
+  · rintro ⟨⟨gates, ⟨idx, neg⟩⟩, hc⟩
+    match gates with
+    | .nil =>
+      refine ⟨idx, neg, fun x => ?_⟩
+      have := hc x
+      simp [Circuit.eval, Ref.eval, GateList.eval] at this
+      exact this.symm
+  · rintro ⟨idx, neg, h⟩
+    refine ⟨⟨.nil, ⟨idx, neg⟩⟩, fun x => ?_⟩
+    simp [Circuit.eval, Ref.eval, GateList.eval]
+    exact (h x).symm
+
+-- ============================================================
+-- Concrete-circuit construction & evaluation helpers
+-- ============================================================
+
+/-- Smart constructor for a wire reference at a concrete index.
+    The bound proof is auto-discharged by `omega`. -/
+abbrev mkRef {b : Nat} (i : Nat) (neg : Bool) (h : i < b := by omega) : Ref b :=
+  ⟨⟨i, h⟩, neg⟩
+
+/-- Smart constructor for an AND gate from two concrete index/negation pairs.
+    Both bound proofs are auto-discharged by `omega`. -/
+abbrev mkGate {b : Nat} (li : Nat) (ln : Bool) (ri : Nat) (rn : Bool)
+    (hl : li < b := by omega) (hr : ri < b := by omega) : Gate b :=
+  ⟨⟨⟨li, hl⟩, ln⟩, ⟨⟨ri, hr⟩, rn⟩⟩
+
+/-- A literal wire reference inside `gates![...]`: either `i` (positive) or
+    `¬i` / `!i` (negated). -/
+declare_syntax_cat circLit
+syntax num : circLit
+syntax "¬" num : circLit
+syntax "!" num : circLit
+
+/-- Internal helpers that extract the index / negation bit from a `circLit`. -/
+syntax "circLit_idx%" circLit : term
+syntax "circLit_neg%" circLit : term
+
+macro_rules
+  | `(circLit_idx% $n:num)   => `($n)
+  | `(circLit_idx% ¬ $n:num) => `($n)
+  | `(circLit_neg% $_:num)   => `(false)
+  | `(circLit_neg% ¬ $_:num) => `(true)
+
+/-- A single AND gate written as `lit ∧ lit`. -/
+syntax circAnd := circLit " ∧ " circLit
+
+/-- List-style notation for building a `GateList`.
+    Each gate is written as `lit ∧ lit`, where each literal is either `i`
+    or `¬i` (negated wire). Gates appear in execution (topological) order:
+    `gates![g₀, g₁, g₂]` expands to `((.nil.cons g₀).cons g₁).cons g₂`.
+
+    Example: `gates![¬1 ∧ 0, ¬3 ∧ 2]` builds two gates `AND(¬x₁, x₀)` and
+    `AND(¬w₃, w₂)` (where `w₃` is the previous gate's output). -/
+syntax "gates![" circAnd,* "]" : term
+macro_rules
+  | `(gates![ $[$as ∧ $bs],* ]) => do
+      let mut acc ← `(GateList.nil)
+      for (a, b) in as.zip bs do
+        acc ← `(GateList.cons $acc
+                  (mkGate (circLit_idx% $a) (circLit_neg% $a)
+                          (circLit_idx% $b) (circLit_neg% $b)))
+      return acc
+
+/-- Tactic for proving `c.eval input = f input` for a concrete circuit `c`
+    and a concrete function `f`. Unfolds circuit evaluation, normalizes
+    the `Nat.add n k` bounds that arise from the dependent `GateList` index,
+    and discharges the remaining Boolean equation with `bv_decide`.
+
+    By default, the head constant of the goal's right-hand side is used as
+    the function definition to unfold. Use `circuit_eval Foo.f_idx` to
+    override (e.g. when the RHS is not headed by a constant). -/
+syntax "circuit_eval" (ppSpace term)? : tactic
+
+elab_rules : tactic
+  | `(tactic| circuit_eval $[$override?]?) => do
+      Lean.Elab.Tactic.evalTactic
+        (← `(tactic| (try unfold Circuit.computes); intros))
+      let fStx : Lean.Term ← match override? with
+        | some t => pure t
+        | none => do
+            let goal ← Lean.Elab.Tactic.getMainTarget
+            let some (_, _, rhs) := goal.eq?
+              | Lean.throwError "circuit_eval: goal is not an equality"
+            let some fname := rhs.getAppFn.constName?
+              | Lean.throwError "circuit_eval: RHS is not headed by a constant"
+            pure ⟨Lean.mkIdent fname⟩
+      Lean.Elab.Tactic.evalTactic (← `(tactic| (
+          simp only [Circuit.eval, Ref.eval, GateList.eval, Gate.eval, extendEnv,
+                     show ∀ a b : Nat, Nat.add a b = a + b from fun _ _ => rfl,
+                     $fStx:term]
+          bv_decide)))
 
 end Circuits
