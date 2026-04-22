@@ -220,6 +220,84 @@ theorem no_size0_of_constant {n : Nat} {f : (Fin n → Bool) → Bool}
       simp_all }
 
 -- ============================================================
+-- Decidability of `∀ x : Fin n → Bool, p x` for small n
+-- ============================================================
+
+/-- Cons a Boolean value at the head of a `Fin n → Bool` family. -/
+def consFn {n : Nat} (b : Bool) (y : Fin n → Bool) : Fin (n+1) → Bool :=
+  fun i => if h : i.val = 0 then b else y ⟨i.val - 1, by have := i.isLt; omega⟩
+
+/-- Bool-valued universal quantification over `Fin n → Bool`, by enumeration. -/
+def allBool : ∀ (n : Nat), ((Fin n → Bool) → Bool) → Bool
+  | 0, f => f Fin.elim0
+  | n+1, f =>
+      allBool n (fun y => f (consFn false y)) &&
+      allBool n (fun y => f (consFn true y))
+
+theorem consFn_eta {n : Nat} (x : Fin (n+1) → Bool) :
+    consFn (x 0) (fun i => x ⟨i.val + 1, by omega⟩) = x := by
+  funext i
+  unfold consFn
+  by_cases h : i.val = 0
+  · rw [dif_pos h]; congr 1; exact Fin.ext h.symm
+  · rw [dif_neg h]; show x _ = x _
+    congr 1; apply Fin.ext
+    show i.val - 1 + 1 = i.val
+    omega
+
+theorem allBool_eq_true : ∀ (n : Nat) (f : (Fin n → Bool) → Bool),
+    allBool n f = true ↔ ∀ x, f x = true
+  | 0, f => by
+    refine ⟨?_, fun h => h _⟩
+    intro h x
+    have : x = Fin.elim0 := funext (fun i => i.elim0)
+    exact this ▸ h
+  | n+1, f => by
+    simp only [allBool, Bool.and_eq_true]
+    rw [allBool_eq_true n, allBool_eq_true n]
+    refine ⟨?_, fun h => ⟨fun y => h _, fun y => h _⟩⟩
+    rintro ⟨hf, ht⟩ x
+    rw [← consFn_eta x]
+    cases x 0
+    · exact hf _
+    · exact ht _
+
+/-- Decidability of universally-quantified Boolean predicates over input
+    assignments. Together with `decide`, this lets us check small-`n`
+    circuit-complexity claims by enumerating all `2^n` input assignments. -/
+instance decForallFinBool {n : Nat} (p : (Fin n → Bool) → Prop) [DecidablePred p] :
+    Decidable (∀ x : Fin n → Bool, p x) :=
+  decidable_of_iff (allBool n (fun x => decide (p x)) = true) <| by
+    rw [allBool_eq_true]
+    refine ⟨fun h x => ?_, fun h x => ?_⟩
+    · exact of_decide_eq_true (h x)
+    · exact decide_eq_true (h x)
+
+/-- A size-0 circuit is just an output wire reference (possibly negated)
+    pointing at one of the inputs. So a function has a size-0 circuit iff
+    it equals (a possibly negated copy of) some input wire.
+
+    Combined with the `decForallFinBool` instance above, this rewrite
+    reduces a goal of the form `¬ HasCircuitOfSize f 0` (for a concrete
+    `f` on small `n`) to a fully decidable statement that `decide` closes. -/
+theorem hasSize0_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
+    HasCircuitOfSize f 0 ↔
+      ∃ (idx : Fin n) (neg : Bool),
+        ∀ x, f x = (if neg then !x idx else x idx) := by
+  constructor
+  · rintro ⟨⟨gates, ⟨idx, neg⟩⟩, hc⟩
+    match gates with
+    | .nil =>
+      refine ⟨idx, neg, fun x => ?_⟩
+      have := hc x
+      simp [Circuit.eval, Ref.eval, GateList.eval] at this
+      exact this.symm
+  · rintro ⟨idx, neg, h⟩
+    refine ⟨⟨.nil, ⟨idx, neg⟩⟩, fun x => ?_⟩
+    simp [Circuit.eval, Ref.eval, GateList.eval]
+    exact (h x).symm
+
+-- ============================================================
 -- Concrete-circuit construction & evaluation helpers
 -- ============================================================
 

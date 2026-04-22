@@ -4,10 +4,44 @@ A lower bound proof shows that no circuit of size less than k computes the
 function. This is the hard direction — it requires ruling out all possible
 circuits.
 
-## Pattern: Constant Functions Have No Size-0 Circuit
+## Pattern: Size-1 functions — `hasSize0_iff` + `decide`
 
-This is proved as a general lemma `Circuits.no_size0_of_constant` in
-`Circuits/Basic.lean`. It works for any number of inputs n:
+For a function known to have circuit complexity 1, the lower bound goal is
+`∀ j, j < 1 → ¬HasCircuitOfSize f j`. The single non-vacuous case is `j = 0`.
+The lemma `hasSize0_iff` characterizes size-0 circuits as exactly the
+wire-or-negated-wire functions, and the `decForallFinBool` instance makes
+the resulting statement decidable:
+
+```lean
+def f_0_lower : ∀ j, j < 1 → ¬HasCircuitOfSize Foo.f_0 j := by
+  intro j hj
+  obtain rfl : j = 0 := by omega
+  rw [hasSize0_iff]; decide
+```
+
+Supporting machinery in `Circuits/Basic.lean`:
+
+- `hasSize0_iff : HasCircuitOfSize f 0 ↔ ∃ idx neg, ∀ x, f x = (if neg then !x idx else x idx)`
+- `decForallFinBool` — `Decidable (∀ x : Fin n → Bool, p x)` via `allBool` enumeration.
+- `allBool` / `consFn` / `allBool_eq_true` — Bool-valued enumeration over `2^n` inputs.
+
+`decide` evaluates `allBool` in the kernel; cost is `O(2^n)` per `(idx, neg)` pair.
+
+## Pattern: Vacuous Lower Bound
+
+When the complexity is 0, the goal `∀ j, j < 0 → …` is vacuously true:
+
+```lean
+def f_idx_lower : ∀ j, j < 0 → ¬HasCircuitOfSize Foo.f_idx j :=
+  fun _ h => absurd h (by omega)
+```
+
+## Pattern: Constant Functions Have No Size-0 Circuit (specialized)
+
+`Circuits.no_size0_of_constant` is a hand-written lemma that predates the
+generic `hasSize0_iff` decision procedure. It still works and is occasionally
+useful when n is large (the kernel `decide` cost is `O(2^n)`, so the generic
+approach doesn't scale beyond ≈ 6 inputs).
 
 ```lean
 theorem no_size0_of_constant {n : Nat} {f : (Fin n → Bool) → Bool}
@@ -15,51 +49,13 @@ theorem no_size0_of_constant {n : Nat} {f : (Fin n → Bool) → Bool}
     ¬HasCircuitOfSize f 0
 ```
 
-The key insight: constant inputs (`fun _ => true` and `fun _ => false`) make the
-circuit output depend only on the negation bit, not which wire is referenced.
-A size-0 circuit always gives different outputs on these two inputs, but a
-constant function gives the same output. Contradiction.
-
-To apply it, just prove the function is constant on all-true vs all-false:
-
-```lean
-exact no_size0_of_constant (by simp [<f_def>])
-```
-
-### Where it appears
-
-- **Size 1**: `Size1/Proofs0.lean`, f_0_lower and f_3_lower
-
-## Pattern: Exhaustive Case Split (Size 0, non-constant)
-
-For non-constant functions that still need a size-0 lower bound excluded
-(because their complexity is > 0 for other reasons), a direct case split
-is needed. Destructure the circuit output, pin the Fin index, case-split
-on the negation bit, and provide a counterexample input for each case.
-
-This shouldn't arise often — most non-constant functions on small n are
-literals (single variable, possibly negated) and DO have size-0 circuits.
-
-## Pattern: Vacuous Lower Bound
-
-When the complexity is 0, the lower bound `∀ j, j < 0 → ...` is vacuously true:
-
-```lean
-fun j hj => absurd hj (by omega)
-```
-
-### Where it appears
-
-- **Size 1**: `Size1/Proofs0.lean`, f_1_lower and f_2_lower
-
 ## Scaling Considerations
 
-For n=2 and beyond, size-0 lower bounds require handling `Fin 2` (or larger)
-indices — more cases to split. For size-1 lower bounds, we must enumerate all
-possible gates (each input to the gate is a `Ref n` with 2n choices), which
-grows as O(n²) circuits. For size ≥ 2, the enumeration grows further.
+For n ≤ 5 or so, the `rw [hasSize0_iff]; decide` pattern is fully automatic.
+Beyond that, kernel evaluation gets slow and we'll need:
+- `no_size0_of_constant` for constant functions
+- Hand-written counterexamples for the wire-and-negation cases
+- For size ≥ 2, structural arguments (Shannon decomposition, fan-in analysis,
+  etc.) since exhaustive circuit enumeration explodes combinatorially
 
-Potential approaches for larger lower bounds:
-- Factor the proof by first reducing to canonical forms
-- Use Shannon decomposition: fix one variable and appeal to smaller-n results
-- Batch cases that share the same counterexample input
+

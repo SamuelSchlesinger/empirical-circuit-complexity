@@ -15,7 +15,9 @@ def f_0_upper : HasCircuitOfSize Size3.Defs0.f_0 1 :=
    by circuit_eval⟩
 
 def f_0_lower : ∀ j, j < 1 → ¬HasCircuitOfSize Size3.Defs0.f_0 j := by
-  sorry
+  intro j hj
+  obtain rfl : j = 0 := by omega
+  rw [hasSize0_iff]; decide
 
 -- f_1: truth table 0x1 — size 2
 
@@ -37,7 +39,9 @@ def f_3_upper : HasCircuitOfSize Size3.Defs0.f_3 1 :=
    by circuit_eval⟩
 
 def f_3_lower : ∀ j, j < 1 → ¬HasCircuitOfSize Size3.Defs0.f_3 j := by
-  sorry
+  intro j hj
+  obtain rfl : j = 0 := by omega
+  rw [hasSize0_iff]; decide
 
 -- f_6: truth table 0x6 — size 4
 
@@ -69,8 +73,8 @@ def f_15_upper : HasCircuitOfSize Size3.Defs0.f_15 0 :=
   ⟨⟨gates![], mkRef 2 true⟩,
    by circuit_eval⟩
 
-def f_15_lower : ∀ j, j < 0 → ¬HasCircuitOfSize Size3.Defs0.f_15 j := by
-  sorry
+def f_15_lower : ∀ j, j < 0 → ¬HasCircuitOfSize Size3.Defs0.f_15 j :=
+  fun _ h => absurd h (by omega)
 
 -- f_22: truth table 0x16 — size 6
 
