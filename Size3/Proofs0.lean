@@ -117,7 +117,15 @@ def f_22_upper : HasCircuitOfSize Size3.Defs0.f_22 6 :=
    by circuit_eval⟩
 
 def f_22_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_22 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 ∨ j = 5 := by omega
+  rcases hj' with rfl | rfl | rfl | rfl | rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
+  · rw [hasSize2_iff]; decide
+  · sorry
+  · sorry
+  · sorry
 
 -- f_23: truth table 0x17 — size 4
 
@@ -149,7 +157,14 @@ def f_24_upper : HasCircuitOfSize Size3.Defs0.f_24 5 :=
    by circuit_eval⟩
 
 def f_24_lower : ∀ j, j < 5 → ¬HasCircuitOfSize Size3.Defs0.f_24 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 := by omega
+  rcases hj' with rfl | rfl | rfl | rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
+  · rw [hasSize2_iff]; decide
+  · sorry
+  · sorry
 
 -- f_25: truth table 0x19 — size 4
 
@@ -235,6 +250,14 @@ def f_105_upper : HasCircuitOfSize Size3.Defs0.f_105 6 :=
    by circuit_eval⟩
 
 def f_105_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_105 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 ∨ j = 5 := by omega
+  rcases hj' with rfl | rfl | rfl | rfl | rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
+  · rw [hasSize2_iff]; decide
+  · sorry
+  · sorry
+  · sorry
 
 end Size3.Proofs0
