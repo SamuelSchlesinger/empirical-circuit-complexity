@@ -668,6 +668,50 @@ theorem hasSize2_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
     refine ⟨⟨.cons (.cons .nil gate0) gate1, ⟨oi, on⟩⟩, fun x => ?_⟩
     exact (h x).symm
 
+/-- Adding a dummy AND gate (whose output is unused) preserves any
+    function that already has a size-k circuit. Requires `0 < n` so we
+    have at least one wire to feed the dummy gate. -/
+theorem HasCircuitOfSize.succ {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {k : Nat} :
+    HasCircuitOfSize f k → HasCircuitOfSize f (k + 1) := by
+  rintro ⟨⟨gates, out⟩, hc⟩
+  let w : Ref (n + k) := ⟨⟨0, by omega⟩, false⟩
+  let dummy : Gate (n + k) := ⟨w, w⟩
+  let out' : Ref (n + (k + 1)) :=
+    ⟨⟨out.index.val, by have := out.index.isLt; omega⟩, out.negated⟩
+  refine ⟨⟨.cons gates dummy, out'⟩, fun input => ?_⟩
+  have hlt : out.index.val < n + k := out.index.isLt
+  have heval := hc input
+  simp only [Circuit.eval, GateList.eval, Ref.eval, extendEnv, out'] at *
+  cases hneg : out.negated <;> simp [hlt, hneg] at heval ⊢ <;> exact heval
+
+/-- Iterated form: any function with a size-j circuit also has a size-k
+    circuit for any `j ≤ k`, provided `0 < n`. -/
+theorem HasCircuitOfSize.mono {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {j k : Nat} (hjk : j ≤ k) :
+    HasCircuitOfSize f j → HasCircuitOfSize f k := by
+  induction k with
+  | zero =>
+    intro h
+    obtain rfl : j = 0 := Nat.le_zero.mp hjk
+    exact h
+  | succ k ih =>
+    intro h
+    rcases Nat.lt_or_ge j (k + 1) with hlt | hge
+    · exact (ih (Nat.lt_succ_iff.mp hlt) h).succ hn
+    · obtain rfl : j = k + 1 := Nat.le_antisymm hjk hge
+      exact h
+
+/-- Contrapositive: if `f` has no size-k circuit, then it has no size-j
+    circuit for any `j ≤ k`. This lets a single `¬HasCircuitOfSize f k`
+    discharge the entire `∀ j, j < k+1 → ¬HasCircuitOfSize f j`
+    obligation in a `_lower` lemma. -/
+theorem not_hasCircuitOfSize_of_le {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {j k : Nat} (hjk : j ≤ k)
+    (hk : ¬HasCircuitOfSize f k) :
+    ¬HasCircuitOfSize f j :=
+  fun hj => hk (hj.mono hn hjk)
+
 -- ============================================================
 -- Concrete-circuit construction & evaluation helpers
 -- ============================================================

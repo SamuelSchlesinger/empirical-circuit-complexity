@@ -64,10 +64,7 @@ def f_6_upper : HasCircuitOfSize Size2.Defs0.f_6 3 :=
 -- Lower bound: XOR requires at least 3 gates.
 def f_6_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size2.Defs0.f_6 j := by
   intro j hj
-  have : j = 0 ∨ j = 1 ∨ j = 2 := by omega
-  rcases this with rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
+  refine not_hasCircuitOfSize_of_le (k := 2) (by decide) (by omega) ?_
+  rw [hasSize2_iff]; decide
 
 end Size2.Proofs0
