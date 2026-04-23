@@ -5,6 +5,8 @@ import Size3.Defs0
 
 set_option maxHeartbeats 4000000
 set_option maxRecDepth 1000000
+set_option profiler true
+set_option profiler.threshold 200
 
 namespace Size3.Proofs0
 
@@ -677,7 +679,8 @@ def f_6_upper : HasCircuitOfSize Size3.Defs0.f_6 4 :=
 def f_6_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_6 j := by
   intro j hj
   if h : j ≤ 2 then
-    exact not_hasCircuitOfSize_of_le (k := 2) (by decide) h (by rw [hasSize2_iff]; decide)
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
   else
     obtain rfl : j = 3 := by omega
     sorry
@@ -722,7 +725,8 @@ def f_22_upper : HasCircuitOfSize Size3.Defs0.f_22 6 :=
 def f_22_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_22 j := by
   intro j hj
   if h : j ≤ 2 then
-    exact not_hasCircuitOfSize_of_le (k := 2) (by decide) h (by rw [hasSize2_iff]; decide)
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
   else
     have : j = 3 ∨ j = 4 ∨ j = 5 := by omega
     rcases this with rfl | rfl | rfl
@@ -741,7 +745,8 @@ def f_23_upper : HasCircuitOfSize Size3.Defs0.f_23 4 :=
 def f_23_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_23 j := by
   intro j hj
   if h : j ≤ 2 then
-    exact not_hasCircuitOfSize_of_le (k := 2) (by decide) h (by rw [hasSize2_iff]; decide)
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
   else
     obtain rfl : j = 3 := by omega
     sorry
@@ -761,7 +766,8 @@ def f_24_upper : HasCircuitOfSize Size3.Defs0.f_24 5 :=
 def f_24_lower : ∀ j, j < 5 → ¬HasCircuitOfSize Size3.Defs0.f_24 j := by
   intro j hj
   if h : j ≤ 2 then
-    exact not_hasCircuitOfSize_of_le (k := 2) (by decide) h (by rw [hasSize2_iff]; decide)
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
   else
     have : j = 3 ∨ j = 4 := by omega
     rcases this with rfl | rfl
@@ -779,7 +785,8 @@ def f_25_upper : HasCircuitOfSize Size3.Defs0.f_25 4 :=
 def f_25_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_25 j := by
   intro j hj
   if h : j ≤ 2 then
-    exact not_hasCircuitOfSize_of_le (k := 2) (by decide) h (by rw [hasSize2_iff]; decide)
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
   else
     obtain rfl : j = 3 := by omega
     sorry
@@ -813,7 +820,8 @@ def f_30_upper : HasCircuitOfSize Size3.Defs0.f_30 4 :=
 def f_30_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_30 j := by
   intro j hj
   if h : j ≤ 2 then
-    exact not_hasCircuitOfSize_of_le (k := 2) (by decide) h (by rw [hasSize2_iff]; decide)
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
   else
     obtain rfl : j = 3 := by omega
     exact f_30_no_size3
@@ -852,7 +860,8 @@ def f_105_upper : HasCircuitOfSize Size3.Defs0.f_105 6 :=
 def f_105_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_105 j := by
   intro j hj
   if h : j ≤ 2 then
-    exact not_hasCircuitOfSize_of_le (k := 2) (by decide) h (by rw [hasSize2_iff]; decide)
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
   else
     have : j = 3 ∨ j = 4 ∨ j = 5 := by omega
     rcases this with rfl | rfl | rfl
