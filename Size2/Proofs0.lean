@@ -65,6 +65,6 @@ def f_6_upper : HasCircuitOfSize Size2.Defs0.f_6 3 :=
 def f_6_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size2.Defs0.f_6 j := by
   intro j hj
   refine not_hasCircuitOfSize_of_le (k := 2) (by decide) (by omega) ?_
-  rw [hasSize2_iff]; decide
+  rw [hasSize2_iff_canon]; decide
 
 end Size2.Proofs0
