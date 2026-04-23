@@ -9,6 +9,8 @@ import Lean.Elab.Tactic
 
 namespace Circuits
 
+variable {n bound : Nat}
+
 /-- Extend a wire environment with one additional wire value. -/
 def extendEnv {n : Nat} (env : Fin n → Bool) (val : Bool) : Fin (n + 1) → Bool :=
   fun i => if h : i.val < n then env ⟨i.val, h⟩ else val
@@ -38,14 +40,16 @@ def Gate.eval (g : Gate bound) (env : Fin bound → Bool) : Bool :=
     Gate i can reference n + i wires: n inputs plus i previous gate outputs. -/
 inductive GateList (n : Nat) : Nat → Type where
   | nil : GateList n 0
-  | cons : GateList n k → Gate (n + k) → GateList n (k + 1)
+  | cons {kprev : Nat} : GateList n kprev → Gate (n + kprev) → GateList n (kprev + 1)
 
 /-- Build the full wire environment by evaluating gates in order. -/
-def GateList.eval (input : Fin n → Bool) : GateList n k → Fin (n + k) → Bool
+def GateList.eval (input : Fin n → Bool) {k : Nat} : GateList n k → Fin (n + k) → Bool
   | .nil => input
   | .cons prev gate =>
     let prevEnv := GateList.eval input prev
     extendEnv prevEnv (gate.eval prevEnv)
+
+variable {k : Nat}
 
 /-- A Boolean circuit with n inputs and k AND gates. -/
 structure Circuit (n : Nat) (k : Nat) where
@@ -88,7 +92,7 @@ def Gate.permuteInputs (g : Gate bound) (n : Nat) (σ : Fin n → Fin n)
   ⟨g.lhs.permuteInputs n σ hn, g.rhs.permuteInputs n σ hn⟩
 
 /-- Remap all input references in a gate list through a permutation. -/
-def GateList.permuteInputs (σ : Fin n → Fin n) : GateList n k → GateList n k
+def GateList.permuteInputs (σ : Fin n → Fin n) {k : Nat} : GateList n k → GateList n k
   | .nil => .nil
   | .cons prev gate => .cons (prev.permuteInputs σ) (gate.permuteInputs n σ (by omega))
 
@@ -221,7 +225,7 @@ def Gate.negateInput (g : Gate bound) (i : Fin n) (hn : n ≤ bound) : Gate boun
   ⟨g.lhs.negateInput i hn, g.rhs.negateInput i hn⟩
 
 /-- Negate input wire i throughout a gate list. -/
-def GateList.negateInput (i : Fin n) : GateList n k → GateList n k
+def GateList.negateInput (i : Fin n) {k : Nat} : GateList n k → GateList n k
   | .nil => .nil
   | .cons prev gate => .cons (prev.negateInput i) (gate.negateInput i (by omega))
 
@@ -337,12 +341,12 @@ def Gate.inputMinor {n m k : Nat} (g : Gate (n + k)) (ρ : Fin n → Ref m) :
   ⟨g.lhs.inputMinor ρ, g.rhs.inputMinor ρ⟩
 
 /-- Substitute input literals throughout a gate list. -/
-def GateList.inputMinor {n m : Nat} (ρ : Fin n → Ref m) : GateList n k → GateList m k
+def GateList.inputMinor {n m : Nat} (ρ : Fin n → Ref m) {k : Nat} : GateList n k → GateList m k
   | .nil => .nil
   | .cons prev gate => .cons (prev.inputMinor ρ) (gate.inputMinor ρ)
 
 /-- Substitute input literals in a circuit without changing the number of gates. -/
-def Circuit.inputMinor (c : Circuit n k) (ρ : Fin n → Ref m) : Circuit m k :=
+def Circuit.inputMinor {m : Nat} (c : Circuit n k) (ρ : Fin n → Ref m) : Circuit m k :=
   ⟨c.gates.inputMinor ρ, c.output.inputMinor ρ⟩
 
 private theorem ref_eval_inputMinor_nil {n m : Nat} (r : Ref n) (ρ : Fin n → Ref m)
@@ -416,7 +420,7 @@ private theorem gateList_eval_inputMinor_ref {n m k : Nat} (gates : GateList n k
 
 /-- Evaluating an input-minor circuit equals evaluating the original circuit
     after applying the literal substitution to the input environment. -/
-theorem Circuit.eval_inputMinor (c : Circuit n k) (ρ : Fin n → Ref m)
+theorem Circuit.eval_inputMinor {m : Nat} (c : Circuit n k) (ρ : Fin n → Ref m)
     (input : Fin m → Bool) :
     (c.inputMinor ρ).eval input = c.eval (fun i => (ρ i).eval input) := by
   cases c with
@@ -663,6 +667,50 @@ theorem hasSize2_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
     let gate1 : Gate (n + 1) := ⟨⟨g1li, g1ln⟩, ⟨g1ri, g1rn⟩⟩
     refine ⟨⟨.cons (.cons .nil gate0) gate1, ⟨oi, on⟩⟩, fun x => ?_⟩
     exact (h x).symm
+
+/-- Adding a dummy AND gate (whose output is unused) preserves any
+    function that already has a size-k circuit. Requires `0 < n` so we
+    have at least one wire to feed the dummy gate. -/
+theorem HasCircuitOfSize.succ {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {k : Nat} :
+    HasCircuitOfSize f k → HasCircuitOfSize f (k + 1) := by
+  rintro ⟨⟨gates, out⟩, hc⟩
+  let w : Ref (n + k) := ⟨⟨0, by omega⟩, false⟩
+  let dummy : Gate (n + k) := ⟨w, w⟩
+  let out' : Ref (n + (k + 1)) :=
+    ⟨⟨out.index.val, by have := out.index.isLt; omega⟩, out.negated⟩
+  refine ⟨⟨.cons gates dummy, out'⟩, fun input => ?_⟩
+  have hlt : out.index.val < n + k := out.index.isLt
+  have heval := hc input
+  simp only [Circuit.eval, GateList.eval, Ref.eval, extendEnv, out'] at *
+  cases hneg : out.negated <;> simp [hlt, hneg] at heval ⊢ <;> exact heval
+
+/-- Iterated form: any function with a size-j circuit also has a size-k
+    circuit for any `j ≤ k`, provided `0 < n`. -/
+theorem HasCircuitOfSize.mono {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {j k : Nat} (hjk : j ≤ k) :
+    HasCircuitOfSize f j → HasCircuitOfSize f k := by
+  induction k with
+  | zero =>
+    intro h
+    obtain rfl : j = 0 := Nat.le_zero.mp hjk
+    exact h
+  | succ k ih =>
+    intro h
+    rcases Nat.lt_or_ge j (k + 1) with hlt | hge
+    · exact (ih (Nat.lt_succ_iff.mp hlt) h).succ hn
+    · obtain rfl : j = k + 1 := Nat.le_antisymm hjk hge
+      exact h
+
+/-- Contrapositive: if `f` has no size-k circuit, then it has no size-j
+    circuit for any `j ≤ k`. This lets a single `¬HasCircuitOfSize f k`
+    discharge the entire `∀ j, j < k+1 → ¬HasCircuitOfSize f j`
+    obligation in a `_lower` lemma. -/
+theorem not_hasCircuitOfSize_of_le {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {j k : Nat} (hjk : j ≤ k)
+    (hk : ¬HasCircuitOfSize f k) :
+    ¬HasCircuitOfSize f j :=
+  fun hj => hk (hj.mono hn hjk)
 
 -- ============================================================
 -- Concrete-circuit construction & evaluation helpers

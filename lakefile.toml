@@ -1,6 +1,12 @@
 name = "Circuits"
 version = "0.1.0"
-defaultTargets = ["Circuits"]
+defaultTargets = ["Circuits", "Size1", "Size2", "Size3"]
+
+[leanOptions]
+pp.unicode.fun = true
+autoImplicit = false
+linter.unusedVariables = true
+linter.deprecated = true
 
 [[lean_lib]]
 name = "Circuits"
