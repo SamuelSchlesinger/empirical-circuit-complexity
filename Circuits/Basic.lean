@@ -668,6 +668,92 @@ theorem hasSize2_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
     refine ⟨⟨.cons (.cons .nil gate0) gate1, ⟨oi, on⟩⟩, fun x => ?_⟩
     exact (h x).symm
 
+/-- Symmetry-broken variant of `hasSize2_iff` that requires each AND gate to
+    have its two input references in canonical order (`lhs.index ≤ rhs.index`).
+    This halves the search space per gate (≈4× overall) for the `decide`
+    enumeration, since `∧` is commutative. -/
+theorem hasSize2_iff_canon {n : Nat} {f : (Fin n → Bool) → Bool} :
+    HasCircuitOfSize f 2 ↔
+      ∃ (g0li : Fin n) (g0ln : Bool) (g0ri : Fin n) (g0rn : Bool)
+        (g1li : Fin (n + 1)) (g1ln : Bool) (g1ri : Fin (n + 1)) (g1rn : Bool)
+        (oi : Fin (n + 2)) (on : Bool),
+        g0li.val ≤ g0ri.val ∧ g1li.val ≤ g1ri.val ∧
+        ∀ x, f x =
+          (⟨oi, on⟩ : Ref (n + 2)).eval
+            (extendEnv
+              (extendEnv x
+                ((⟨⟨g0li, g0ln⟩, ⟨g0ri, g0rn⟩⟩ : Gate n).eval x))
+              ((⟨⟨g1li, g1ln⟩, ⟨g1ri, g1rn⟩⟩ : Gate (n + 1)).eval
+                (extendEnv x
+                  ((⟨⟨g0li, g0ln⟩, ⟨g0ri, g0rn⟩⟩ : Gate n).eval x)))) := by
+  rw [hasSize2_iff]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨a, b, c, d, e, p, g, h, oi, on, hh⟩
+    by_cases hac : a.val ≤ c.val
+    · by_cases heg : e.val ≤ g.val
+      · exact ⟨a, b, c, d, e, p, g, h, oi, on, hac, heg, hh⟩
+      · refine ⟨a, b, c, d, g, h, e, p, oi, on, hac,
+          Nat.le_of_lt (Nat.lt_of_not_le heg), fun x => ?_⟩
+        rw [hh x]; simp only [Gate.eval, Bool.and_comm]
+    · by_cases heg : e.val ≤ g.val
+      · refine ⟨c, d, a, b, e, p, g, h, oi, on,
+          Nat.le_of_lt (Nat.lt_of_not_le hac), heg, fun x => ?_⟩
+        rw [hh x]; simp only [Gate.eval, Bool.and_comm]
+      · refine ⟨c, d, a, b, g, h, e, p, oi, on,
+          Nat.le_of_lt (Nat.lt_of_not_le hac),
+          Nat.le_of_lt (Nat.lt_of_not_le heg), fun x => ?_⟩
+        rw [hh x]; simp only [Gate.eval, Bool.and_comm]
+  · rintro ⟨a, b, c, d, e, p, g, h, oi, on, _, _, hh⟩
+    exact ⟨a, b, c, d, e, p, g, h, oi, on, hh⟩
+
+-- ============================================================
+-- Monotonicity of HasCircuitOfSize
+-- ============================================================
+
+/-- A `k`-gate circuit can be padded with one extra (unused) AND gate to
+    obtain an equivalent `k+1`-gate circuit. We need `0 < n` so that the
+    padding gate has at least one input wire to reference. -/
+theorem HasCircuitOfSize.succ {n : Nat} (hn : 0 < n)
+    {f : (Fin n → Bool) → Bool} {k : Nat} :
+    HasCircuitOfSize f k → HasCircuitOfSize f (k + 1) := by
+  rintro ⟨⟨gates, out⟩, hc⟩
+  let w : Ref (n + k) := ⟨⟨0, by omega⟩, false⟩
+  let dummy : Gate (n + k) := ⟨w, w⟩
+  let out' : Ref (n + (k + 1)) :=
+    ⟨⟨out.index.val, by have := out.index.isLt; omega⟩, out.negated⟩
+  refine ⟨⟨.cons gates dummy, out'⟩, fun input => ?_⟩
+  have hlt : out.index.val < n + k := out.index.isLt
+  have heval := hc input
+  simp only [Circuit.eval, GateList.eval, Ref.eval, extendEnv, out'] at *
+  cases hneg : out.negated <;> simp [hlt, hneg] at heval ⊢ <;> exact heval
+
+/-- Monotonicity: a function with a size-`j` circuit also has a size-`k`
+    circuit for any `j ≤ k`, by padding with unused gates. -/
+theorem HasCircuitOfSize.mono {n : Nat} (hn : 0 < n)
+    {f : (Fin n → Bool) → Bool} {j k : Nat} (hjk : j ≤ k) :
+    HasCircuitOfSize f j → HasCircuitOfSize f k := by
+  induction k with
+  | zero =>
+    intro h
+    obtain rfl : j = 0 := Nat.le_zero.mp hjk
+    exact h
+  | succ k ih =>
+    intro h
+    rcases Nat.lt_or_ge j (k + 1) with hlt | hge
+    · exact (ih (Nat.lt_succ_iff.mp hlt) h).succ hn
+    · obtain rfl : j = k + 1 := Nat.le_antisymm hjk hge
+      exact h
+
+/-- Contrapositive form, ideal for lower-bound proofs: if a function has no
+    size-`k` circuit, then it has no size-`j` circuit for any `j ≤ k`. This
+    lets a single ruled-out size discharge an entire `∀ j, j < k+1, ¬…`
+    obligation, replacing several `decide` calls with one. -/
+theorem not_hasCircuitOfSize_of_le {n : Nat} (hn : 0 < n)
+    {f : (Fin n → Bool) → Bool} {j k : Nat} (hjk : j ≤ k)
+    (hk : ¬HasCircuitOfSize f k) :
+    ¬HasCircuitOfSize f j :=
+  fun hj => hk (hj.mono hn hjk)
+
 -- ============================================================
 -- Concrete-circuit construction & evaluation helpers
 -- ============================================================

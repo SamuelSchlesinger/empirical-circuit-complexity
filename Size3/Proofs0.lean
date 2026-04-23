@@ -4,6 +4,8 @@ import Size2.Proofs0
 import Size3.Defs0
 
 set_option maxHeartbeats 4000000
+set_option profiler true
+set_option profiler.threshold 200
 
 namespace Size3.Proofs0
 
@@ -42,10 +44,8 @@ def f_1_upper : HasCircuitOfSize Size3.Defs0.f_1 2 :=
 
 def f_1_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_1 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 := by omega
-  rcases hj' with rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
+  refine not_hasCircuitOfSize_of_le (k := 1) (by decide) (by omega) ?_
+  rw [hasSize1_iff]; decide
 
 -- f_3: truth table 0x3 — size 1
 
@@ -70,12 +70,12 @@ def f_6_upper : HasCircuitOfSize Size3.Defs0.f_6 4 :=
 
 def f_6_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_6 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
-  rcases hj' with rfl | rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
-  · sorry
+  if h : j ≤ 2 then
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
+  else
+    obtain rfl : j = 3 := by omega
+    sorry
 
 -- f_7: truth table 0x7 — size 2
 
@@ -87,12 +87,8 @@ def f_7_upper : HasCircuitOfSize Size3.Defs0.f_7 2 :=
 
 def f_7_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_7 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 := by omega
-  rcases hj' with rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-
--- f_15: truth table 0xf — size 0
+  refine not_hasCircuitOfSize_of_le (k := 1) (by decide) (by omega) ?_
+  rw [hasSize1_iff]; decide
 
 def f_15_size : Nat := 0
 
@@ -118,14 +114,15 @@ def f_22_upper : HasCircuitOfSize Size3.Defs0.f_22 6 :=
 
 def f_22_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_22 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 ∨ j = 5 := by omega
-  rcases hj' with rfl | rfl | rfl | rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
-  · sorry
-  · sorry
-  · sorry
+  if h : j ≤ 2 then
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
+  else
+    have : j = 3 ∨ j = 4 ∨ j = 5 := by omega
+    rcases this with rfl | rfl | rfl
+    · sorry
+    · sorry
+    · sorry
 
 -- f_23: truth table 0x17 — size 4
 
@@ -137,12 +134,12 @@ def f_23_upper : HasCircuitOfSize Size3.Defs0.f_23 4 :=
 
 def f_23_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_23 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
-  rcases hj' with rfl | rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
-  · sorry
+  if h : j ≤ 2 then
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
+  else
+    obtain rfl : j = 3 := by omega
+    sorry
 
 -- f_24: truth table 0x18 — size 5
 
@@ -158,13 +155,14 @@ def f_24_upper : HasCircuitOfSize Size3.Defs0.f_24 5 :=
 
 def f_24_lower : ∀ j, j < 5 → ¬HasCircuitOfSize Size3.Defs0.f_24 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 := by omega
-  rcases hj' with rfl | rfl | rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
-  · sorry
-  · sorry
+  if h : j ≤ 2 then
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
+  else
+    have : j = 3 ∨ j = 4 := by omega
+    rcases this with rfl | rfl
+    · sorry
+    · sorry
 
 -- f_25: truth table 0x19 — size 4
 
@@ -176,12 +174,12 @@ def f_25_upper : HasCircuitOfSize Size3.Defs0.f_25 4 :=
 
 def f_25_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_25 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
-  rcases hj' with rfl | rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
-  · sorry
+  if h : j ≤ 2 then
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
+  else
+    obtain rfl : j = 3 := by omega
+    sorry
 
 -- f_27: truth table 0x1b — size 3
 
@@ -211,12 +209,12 @@ def f_30_upper : HasCircuitOfSize Size3.Defs0.f_30 4 :=
 
 def f_30_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_30 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
-  rcases hj' with rfl | rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
-  · sorry
+  if h : j ≤ 2 then
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
+  else
+    obtain rfl : j = 3 := by omega
+    sorry
 
 -- f_60: truth table 0x3c — size 3
 
@@ -251,13 +249,14 @@ def f_105_upper : HasCircuitOfSize Size3.Defs0.f_105 6 :=
 
 def f_105_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_105 j := by
   intro j hj
-  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 ∨ j = 5 := by omega
-  rcases hj' with rfl | rfl | rfl | rfl | rfl | rfl
-  · rw [hasSize0_iff]; decide
-  · rw [hasSize1_iff]; decide
-  · rw [hasSize2_iff]; decide
-  · sorry
-  · sorry
-  · sorry
+  if h : j ≤ 2 then
+    exact not_hasCircuitOfSize_of_le (by decide) h
+      (by rw [hasSize2_iff_canon]; decide)
+  else
+    have : j = 3 ∨ j = 4 ∨ j = 5 := by omega
+    rcases this with rfl | rfl | rfl
+    · sorry
+    · sorry
+    · sorry
 
 end Size3.Proofs0
