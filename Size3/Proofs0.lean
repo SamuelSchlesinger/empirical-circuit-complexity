@@ -90,6 +90,8 @@ def f_7_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_7 j := by
   refine not_hasCircuitOfSize_of_le (k := 1) (by decide) (by omega) ?_
   rw [hasSize1_iff]; decide
 
+-- f_15: truth table 0xf — size 0
+
 def f_15_size : Nat := 0
 
 def f_15_upper : HasCircuitOfSize Size3.Defs0.f_15 0 :=

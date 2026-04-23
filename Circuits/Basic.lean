@@ -710,11 +710,11 @@ theorem hasSize2_iff_canon {n : Nat} {f : (Fin n → Bool) → Bool} :
 -- Monotonicity of HasCircuitOfSize
 -- ============================================================
 
-/-- A `k`-gate circuit can be padded with one extra (unused) AND gate to
-    obtain an equivalent `k+1`-gate circuit. We need `0 < n` so that the
-    padding gate has at least one input wire to reference. -/
-theorem HasCircuitOfSize.succ {n : Nat} (hn : 0 < n)
-    {f : (Fin n → Bool) → Bool} {k : Nat} :
+/-- Adding a dummy AND gate (whose output is unused) preserves any
+    function that already has a size-k circuit. Requires `0 < n` so we
+    have at least one wire to feed the dummy gate. -/
+theorem HasCircuitOfSize.succ {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {k : Nat} :
     HasCircuitOfSize f k → HasCircuitOfSize f (k + 1) := by
   rintro ⟨⟨gates, out⟩, hc⟩
   let w : Ref (n + k) := ⟨⟨0, by omega⟩, false⟩
@@ -727,10 +727,10 @@ theorem HasCircuitOfSize.succ {n : Nat} (hn : 0 < n)
   simp only [Circuit.eval, GateList.eval, Ref.eval, extendEnv, out'] at *
   cases hneg : out.negated <;> simp [hlt, hneg] at heval ⊢ <;> exact heval
 
-/-- Monotonicity: a function with a size-`j` circuit also has a size-`k`
-    circuit for any `j ≤ k`, by padding with unused gates. -/
-theorem HasCircuitOfSize.mono {n : Nat} (hn : 0 < n)
-    {f : (Fin n → Bool) → Bool} {j k : Nat} (hjk : j ≤ k) :
+/-- Iterated form: any function with a size-j circuit also has a size-k
+    circuit for any `j ≤ k`, provided `0 < n`. -/
+theorem HasCircuitOfSize.mono {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {j k : Nat} (hjk : j ≤ k) :
     HasCircuitOfSize f j → HasCircuitOfSize f k := by
   induction k with
   | zero =>
@@ -744,12 +744,12 @@ theorem HasCircuitOfSize.mono {n : Nat} (hn : 0 < n)
     · obtain rfl : j = k + 1 := Nat.le_antisymm hjk hge
       exact h
 
-/-- Contrapositive form, ideal for lower-bound proofs: if a function has no
-    size-`k` circuit, then it has no size-`j` circuit for any `j ≤ k`. This
-    lets a single ruled-out size discharge an entire `∀ j, j < k+1, ¬…`
-    obligation, replacing several `decide` calls with one. -/
-theorem not_hasCircuitOfSize_of_le {n : Nat} (hn : 0 < n)
-    {f : (Fin n → Bool) → Bool} {j k : Nat} (hjk : j ≤ k)
+/-- Contrapositive: if `f` has no size-k circuit, then it has no size-j
+    circuit for any `j ≤ k`. This lets a single `¬HasCircuitOfSize f k`
+    discharge the entire `∀ j, j < k+1 → ¬HasCircuitOfSize f j`
+    obligation in a `_lower` lemma. -/
+theorem not_hasCircuitOfSize_of_le {n : Nat} {f : (Fin n → Bool) → Bool}
+    (hn : 0 < n) {j k : Nat} (hjk : j ≤ k)
     (hk : ¬HasCircuitOfSize f k) :
     ¬HasCircuitOfSize f j :=
   fun hj => hk (hj.mono hn hjk)
