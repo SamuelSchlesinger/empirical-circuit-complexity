@@ -1,10 +1,23 @@
 import Std.Tactic.BVDecide
 import Circuits.Basic
+import Size2.Proofs0
 import Size3.Defs0
+
+set_option maxHeartbeats 4000000
 
 namespace Size3.Proofs0
 
 open Circuits
+
+private def f_27_xorMinor : Fin 3 → Ref 2 := fun i =>
+  if i.val = 0 then mkRef 0 false
+  else if i.val = 1 then mkRef 1 true
+  else mkRef 1 false
+
+private def f_60_xorMinor : Fin 3 → Ref 2 := fun i =>
+  if i.val = 0 then mkRef 0 false
+  else if i.val = 1 then mkRef 0 false
+  else mkRef 1 false
 
 -- f_0: truth table 0x0 — size 1
 
@@ -28,7 +41,11 @@ def f_1_upper : HasCircuitOfSize Size3.Defs0.f_1 2 :=
    by circuit_eval⟩
 
 def f_1_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_1 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 := by omega
+  rcases hj' with rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
 
 -- f_3: truth table 0x3 — size 1
 
@@ -52,7 +69,13 @@ def f_6_upper : HasCircuitOfSize Size3.Defs0.f_6 4 :=
    by circuit_eval⟩
 
 def f_6_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_6 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
+  rcases hj' with rfl | rfl | rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
+  · rw [hasSize2_iff]; decide
+  · sorry
 
 -- f_7: truth table 0x7 — size 2
 
@@ -63,7 +86,11 @@ def f_7_upper : HasCircuitOfSize Size3.Defs0.f_7 2 :=
    by circuit_eval⟩
 
 def f_7_lower : ∀ j, j < 2 → ¬HasCircuitOfSize Size3.Defs0.f_7 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 := by omega
+  rcases hj' with rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
 
 -- f_15: truth table 0xf — size 0
 
@@ -101,7 +128,13 @@ def f_23_upper : HasCircuitOfSize Size3.Defs0.f_23 4 :=
    by circuit_eval⟩
 
 def f_23_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_23 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
+  rcases hj' with rfl | rfl | rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
+  · rw [hasSize2_iff]; decide
+  · sorry
 
 -- f_24: truth table 0x18 — size 5
 
@@ -127,7 +160,13 @@ def f_25_upper : HasCircuitOfSize Size3.Defs0.f_25 4 :=
    by circuit_eval⟩
 
 def f_25_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_25 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
+  rcases hj' with rfl | rfl | rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
+  · rw [hasSize2_iff]; decide
+  · sorry
 
 -- f_27: truth table 0x1b — size 3
 
@@ -138,7 +177,14 @@ def f_27_upper : HasCircuitOfSize Size3.Defs0.f_27 3 :=
    by circuit_eval⟩
 
 def f_27_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size3.Defs0.f_27 j := by
-  sorry
+  intro j hj
+  exact noCircuitOfSize_of_inputMinor
+    (f := Size3.Defs0.f_27) (g := Size2.Defs0.f_6)
+    f_27_xorMinor
+    (by
+      intro input
+      simp [f_27_xorMinor, Size2.Defs0.f_6, Size3.Defs0.f_27, Ref.eval])
+    (Size2.Proofs0.f_6_lower j hj)
 
 -- f_30: truth table 0x1e — size 4
 
@@ -149,7 +195,13 @@ def f_30_upper : HasCircuitOfSize Size3.Defs0.f_30 4 :=
    by circuit_eval⟩
 
 def f_30_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_30 j := by
-  sorry
+  intro j hj
+  have hj' : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 := by omega
+  rcases hj' with rfl | rfl | rfl | rfl
+  · rw [hasSize0_iff]; decide
+  · rw [hasSize1_iff]; decide
+  · rw [hasSize2_iff]; decide
+  · sorry
 
 -- f_60: truth table 0x3c — size 3
 
@@ -160,7 +212,14 @@ def f_60_upper : HasCircuitOfSize Size3.Defs0.f_60 3 :=
    by circuit_eval⟩
 
 def f_60_lower : ∀ j, j < 3 → ¬HasCircuitOfSize Size3.Defs0.f_60 j := by
-  sorry
+  intro j hj
+  exact noCircuitOfSize_of_inputMinor
+    (f := Size3.Defs0.f_60) (g := Size2.Defs0.f_6)
+    f_60_xorMinor
+    (by
+      intro input
+      simp [f_60_xorMinor, Size2.Defs0.f_6, Size3.Defs0.f_60, Ref.eval])
+    (Size2.Proofs0.f_6_lower j hj)
 
 -- f_105: truth table 0x69 — size 6
 

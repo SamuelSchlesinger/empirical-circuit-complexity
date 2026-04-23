@@ -58,4 +58,28 @@ Beyond that, kernel evaluation gets slow and we'll need:
 - For size ≥ 2, structural arguments (Shannon decomposition, fan-in analysis,
   etc.) since exhaustive circuit enumeration explodes combinatorially
 
+## Pattern: Input Minors
+
+`Circuits.noCircuitOfSize_of_inputMinor` transfers a lower bound from a hard
+minor. If substituting literals for the inputs of `f` yields `g`, then any
+size-`k` circuit for `f` would give a size-`k` circuit for `g`.
+
+This closes representatives like `Size3.f_27` and `Size3.f_60`, which contain
+the 2-input XOR representative as a literal minor.
+
+## Pattern: Last-Gate Decomposition
+
+`Circuits.HasCircuitOfSize.succ_decompose` exposes the final gate of a circuit.
+A `(k+1)`-gate circuit either ignores its last gate, or computes an AND/NAND of
+two functions already computable by the `k`-gate prefix.
+
+The contrapositive helper is:
+
+```lean
+noCircuitOfSize_succ_of_no_decompose
+```
+
+This is the intended next step for the hard Size3 lower bounds: prove that the
+two prefix functions needed for the target cannot coexist in the same smaller
+prefix, instead of enumerating all size-3 circuits directly.
 

@@ -96,6 +96,60 @@ def GateList.permuteInputs (σ : Fin n → Fin n) : GateList n k → GateList n 
 def Circuit.permuteInputs (c : Circuit n k) (σ : Fin n → Fin n) : Circuit n k :=
   ⟨c.gates.permuteInputs σ, c.output.permuteInputs n σ (by omega)⟩
 
+private theorem ref_eval_permuteInputs_nil {n : Nat} (r : Ref n) (σ : Fin n → Fin n)
+    (input : Fin n → Bool) :
+    (r.permuteInputs n σ (by omega)).eval input = r.eval (input ∘ σ) := by
+  cases r with
+  | mk idx neg =>
+    simp [Ref.permuteInputs, Ref.eval, Function.comp]
+
+private theorem gate_eval_permuteInputs {n k : Nat} (gate : Gate (n + k))
+    (σ : Fin n → Fin n) (envP envO : Fin (n + k) → Bool)
+    (henv : ∀ r : Ref (n + k),
+      (r.permuteInputs n σ (by omega)).eval envP = r.eval envO) :
+    (gate.permuteInputs n σ (by omega)).eval envP = gate.eval envO := by
+  cases gate with
+  | mk lhs rhs =>
+    simp [Gate.permuteInputs, Gate.eval, henv]
+
+private theorem gateList_eval_permuteInputs_ref {n k : Nat} (gates : GateList n k)
+    (σ : Fin n → Fin n) (input : Fin n → Bool) :
+    ∀ r : Ref (n + k),
+      (r.permuteInputs n σ (by omega)).eval ((gates.permuteInputs σ).eval input) =
+        r.eval (gates.eval (input ∘ σ)) := by
+  induction gates with
+  | nil =>
+    intro r
+    simpa using ref_eval_permuteInputs_nil r σ input
+  | cons prev gate ih =>
+    rename_i kprev
+    intro r
+    have hgate : (gate.permuteInputs n σ (by omega)).eval
+        ((prev.permuteInputs σ).eval input) = gate.eval (prev.eval (input ∘ σ)) :=
+      gate_eval_permuteInputs gate σ ((prev.permuteInputs σ).eval input)
+        (prev.eval (input ∘ σ)) ih
+    cases r with
+    | mk idx neg =>
+      by_cases hprev : idx.val < n + kprev
+      · by_cases hinput : idx.val < n
+        · have ih' :=
+            ih ({ index := ⟨idx.val, hprev⟩, negated := neg } : Ref (n + kprev))
+          have hσprev : ∀ h : idx.val < n, (σ ⟨idx.val, h⟩).val < n + kprev := by
+            intro h
+            have := (σ ⟨idx.val, h⟩).isLt
+            omega
+          simp [Ref.permuteInputs, Ref.eval, GateList.eval, GateList.permuteInputs,
+            extendEnv, hprev, hinput, hσprev] at ih' ⊢
+          simpa using ih'
+        · have ih' :=
+            ih ({ index := ⟨idx.val, hprev⟩, negated := neg } : Ref (n + kprev))
+          simp [Ref.permuteInputs, Ref.eval, GateList.eval, GateList.permuteInputs,
+            extendEnv, hprev, hinput] at ih' ⊢
+          simpa using ih'
+      · have hnidx : ¬idx.val < n := by omega
+        simp [Ref.permuteInputs, Ref.eval, GateList.eval, GateList.permuteInputs,
+          extendEnv, hprev, hnidx, hgate]
+
 /-- Evaluating a permuted circuit on input x equals evaluating
     the original circuit on x ∘ σ. The permuted gate list produces
     the same gate outputs because each remapped input reference σ(i)
@@ -104,14 +158,17 @@ def Circuit.permuteInputs (c : Circuit n k) (σ : Fin n → Fin n) : Circuit n k
 theorem Circuit.eval_permuteInputs (c : Circuit n k) (σ : Fin n → Fin n)
     (input : Fin n → Bool) :
     (c.permuteInputs σ).eval input = c.eval (input ∘ σ) := by
-  sorry -- TODO: induction on gate list with environment invariant
+  cases c with
+  | mk gates output =>
+    simpa [Circuit.permuteInputs, Circuit.eval] using
+      gateList_eval_permuteInputs_ref gates σ input output
 
 /-- Circuit complexity is invariant under permutation of input variables.
     Given mutually inverse permutations σ and τ, if g(x) = f(x ∘ σ) for all x,
     then f and g have the same circuit complexity. -/
 theorem CircuitComplexity_perm {n : Nat} {f g : (Fin n → Bool) → Bool} {k : Nat}
     (σ τ : Fin n → Fin n)
-    (hστ : ∀ i, σ (τ i) = i)
+    (_hστ : ∀ i, σ (τ i) = i)
     (hτσ : ∀ i, τ (σ i) = i)
     (hfg : ∀ x, g x = f (x ∘ σ)) :
     CircuitComplexity f k → CircuitComplexity g k := by
@@ -156,7 +213,7 @@ theorem CircuitComplexity_neg {n : Nat} {f : (Fin n → Bool) → Bool} {k : Nat
 
 /-- Flip the negation bit on a wire reference if it refers to input wire i.
     Gate wires (index ≥ n) are unchanged. -/
-def Ref.negateInput (r : Ref bound) (i : Fin n) (hn : n ≤ bound) : Ref bound :=
+def Ref.negateInput (r : Ref bound) (i : Fin n) (_hn : n ≤ bound) : Ref bound :=
   if r.index.val = i.val then ⟨r.index, !r.negated⟩ else r
 
 /-- Negate input wire i in a gate. -/
@@ -172,6 +229,65 @@ def GateList.negateInput (i : Fin n) : GateList n k → GateList n k
 def Circuit.negateInput (c : Circuit n k) (i : Fin n) : Circuit n k :=
   ⟨c.gates.negateInput i, c.output.negateInput i (by omega)⟩
 
+private theorem ref_eval_negateInput_nil {n : Nat} (r : Ref n) (i : Fin n)
+    (input : Fin n → Bool) :
+    (r.negateInput i (by omega)).eval input =
+      r.eval (fun j => if j = i then !input j else input j) := by
+  cases r with
+  | mk idx neg =>
+    simp [Ref.negateInput, Ref.eval]
+    by_cases h : idx.val = i.val
+    · have hidx : idx = i := Fin.ext h
+      subst hidx
+      cases neg <;> simp
+    · have hidx : idx ≠ i := by
+        intro heq
+        exact h (congrArg Fin.val heq)
+      simp [h, hidx]
+
+private theorem gate_eval_negateInput {n k : Nat} (gate : Gate (n + k))
+    (i : Fin n) (envN envO : Fin (n + k) → Bool)
+    (henv : ∀ r : Ref (n + k), (r.negateInput i (by omega)).eval envN = r.eval envO) :
+    (gate.negateInput i (by omega)).eval envN = gate.eval envO := by
+  cases gate with
+  | mk lhs rhs =>
+    simp [Gate.negateInput, Gate.eval, henv]
+
+private theorem gateList_eval_negateInput_ref {n k : Nat} (gates : GateList n k)
+    (i : Fin n) (input : Fin n → Bool) :
+    ∀ r : Ref (n + k),
+      (r.negateInput i (by omega)).eval ((gates.negateInput i).eval input) =
+        r.eval (gates.eval (fun j => if j = i then !input j else input j)) := by
+  induction gates with
+  | nil =>
+    intro r
+    simpa using ref_eval_negateInput_nil r i input
+  | cons prev gate ih =>
+    rename_i kprev
+    intro r
+    have hgate : (gate.negateInput i (by omega)).eval ((prev.negateInput i).eval input) =
+        gate.eval (prev.eval (fun j => if j = i then !input j else input j)) :=
+      gate_eval_negateInput gate i ((prev.negateInput i).eval input)
+        (prev.eval (fun j => if j = i then !input j else input j)) ih
+    cases r with
+    | mk idx neg =>
+      by_cases hprev : idx.val < n + kprev
+      · by_cases heq : idx.val = i.val
+        · have ih' :=
+            ih ({ index := ⟨idx.val, hprev⟩, negated := neg } : Ref (n + kprev))
+          have hiprev : i.val < n + kprev := by omega
+          simp [Ref.negateInput, Ref.eval, GateList.eval, GateList.negateInput,
+            extendEnv, heq, hiprev] at ih' ⊢
+          simpa using ih'
+        · have ih' :=
+            ih ({ index := ⟨idx.val, hprev⟩, negated := neg } : Ref (n + kprev))
+          simp [Ref.negateInput, Ref.eval, GateList.eval, GateList.negateInput,
+            extendEnv, hprev, heq] at ih' ⊢
+          simpa using ih'
+      · have hidx : ¬idx.val = i.val := by omega
+        simp [Ref.negateInput, Ref.eval, GateList.eval, GateList.negateInput,
+          extendEnv, hprev, hidx, hgate]
+
 /-- Evaluating a circuit with negated input wire i on input x equals
     evaluating the original circuit on x with bit i flipped.
     Conceptually straightforward (flip one wire's negation bits) but
@@ -180,7 +296,10 @@ theorem Circuit.eval_negateInput (c : Circuit n k) (i : Fin n)
     (input : Fin n → Bool) :
     (c.negateInput i).eval input =
     c.eval (fun j => if j = i then !input j else input j) := by
-  sorry -- TODO: induction on gate list with environment invariant
+  cases c with
+  | mk gates output =>
+    simpa [Circuit.negateInput, Circuit.eval] using
+      gateList_eval_negateInput_ref gates i input output
 
 /-- Circuit complexity is invariant under negation of an input variable.
     Flipping the negation bit on input wire i is free, so
@@ -198,6 +317,203 @@ theorem CircuitComplexity_negInput {n : Nat} {f : (Fin n → Bool) → Bool} {k 
       rw [h]; dsimp only
       congr 1; funext p
       by_cases hp : p = i <;> simp [hp]⟩
+
+-- ============================================================
+-- Input minors
+-- ============================================================
+
+/-- Substitute each input wire by a literal over a smaller input set.
+    Gate wires are shifted from the old input prefix to the new input prefix. -/
+def Ref.inputMinor {n m k : Nat} (r : Ref (n + k)) (ρ : Fin n → Ref m) : Ref (m + k) :=
+  if h : r.index.val < n then
+    let rr := ρ ⟨r.index.val, h⟩
+    ⟨⟨rr.index.val, by have := rr.index.isLt; omega⟩, Bool.xor r.negated rr.negated⟩
+  else
+    ⟨⟨m + (r.index.val - n), by have := r.index.isLt; omega⟩, r.negated⟩
+
+/-- Substitute input literals in a gate. -/
+def Gate.inputMinor {n m k : Nat} (g : Gate (n + k)) (ρ : Fin n → Ref m) :
+    Gate (m + k) :=
+  ⟨g.lhs.inputMinor ρ, g.rhs.inputMinor ρ⟩
+
+/-- Substitute input literals throughout a gate list. -/
+def GateList.inputMinor {n m : Nat} (ρ : Fin n → Ref m) : GateList n k → GateList m k
+  | .nil => .nil
+  | .cons prev gate => .cons (prev.inputMinor ρ) (gate.inputMinor ρ)
+
+/-- Substitute input literals in a circuit without changing the number of gates. -/
+def Circuit.inputMinor (c : Circuit n k) (ρ : Fin n → Ref m) : Circuit m k :=
+  ⟨c.gates.inputMinor ρ, c.output.inputMinor ρ⟩
+
+private theorem ref_eval_inputMinor_nil {n m : Nat} (r : Ref n) (ρ : Fin n → Ref m)
+    (input : Fin m → Bool) :
+    (r.inputMinor (k := 0) ρ).eval input = r.eval (fun i => (ρ i).eval input) := by
+  cases r with
+  | mk idx neg =>
+    have hidx : idx.val < n := idx.isLt
+    simp [Ref.inputMinor, Ref.eval, hidx]
+    cases neg <;> cases hρ : (ρ idx).negated <;> simp
+
+private theorem gate_eval_inputMinor {n m k : Nat} (gate : Gate (n + k))
+    (ρ : Fin n → Ref m) (envM : Fin (m + k) → Bool) (envN : Fin (n + k) → Bool)
+    (henv : ∀ r : Ref (n + k), (r.inputMinor ρ).eval envM = r.eval envN) :
+    (gate.inputMinor ρ).eval envM = gate.eval envN := by
+  cases gate with
+  | mk lhs rhs =>
+    simp [Gate.inputMinor, Gate.eval, henv]
+
+private theorem gateList_eval_inputMinor_ref {n m k : Nat} (gates : GateList n k)
+    (ρ : Fin n → Ref m) (input : Fin m → Bool) :
+    ∀ r : Ref (n + k),
+      (r.inputMinor ρ).eval ((gates.inputMinor ρ).eval input) =
+        r.eval (gates.eval (fun i => (ρ i).eval input)) := by
+  induction gates with
+  | nil =>
+    intro r
+    simpa using ref_eval_inputMinor_nil r ρ input
+  | cons prev gate ih =>
+    rename_i kprev
+    intro r
+    have hgate : (gate.inputMinor ρ).eval ((prev.inputMinor ρ).eval input) =
+        gate.eval (prev.eval (fun i => (ρ i).eval input)) :=
+      gate_eval_inputMinor gate ρ ((prev.inputMinor ρ).eval input)
+        (prev.eval (fun i => (ρ i).eval input)) ih
+    cases r with
+    | mk idx neg =>
+      by_cases hinput : idx.val < n
+      · have hprev : idx.val < n + kprev := by omega
+        have ih' :=
+          ih ({ index := ⟨idx.val, hprev⟩, negated := neg } : Ref (n + kprev))
+        have hρprev : ∀ h : idx.val < n, (ρ ⟨idx.val, h⟩).index.val < m + kprev := by
+          intro h
+          have := (ρ ⟨idx.val, h⟩).index.isLt
+          omega
+        have hρeq : ∀ h : idx.val < n, ρ ⟨idx.val, h⟩ = ρ ⟨idx.val, hinput⟩ := by
+          intro h
+          apply congrArg ρ
+          exact Fin.ext rfl
+        simp [Ref.inputMinor, Ref.eval, GateList.eval, GateList.inputMinor,
+          extendEnv, hinput, hprev, hρprev, hρeq] at ih' ⊢
+        change (if neg = (ρ ⟨idx.val, hinput⟩).negated then
+            GateList.eval input (GateList.inputMinor ρ prev)
+              ⟨(ρ ⟨idx.val, hinput⟩).index.val, hρprev hinput⟩
+          else !GateList.eval input (GateList.inputMinor ρ prev)
+              ⟨(ρ ⟨idx.val, hinput⟩).index.val, hρprev hinput⟩) =
+          (if neg then
+            !GateList.eval (fun i => (ρ i).eval input) prev ⟨idx.val, hprev⟩
+          else GateList.eval (fun i => (ρ i).eval input) prev ⟨idx.val, hprev⟩)
+        simpa [Ref.eval] using ih'
+      · by_cases hprev : idx.val < n + kprev
+        · have ih' :=
+            ih ({ index := ⟨idx.val, hprev⟩, negated := neg } : Ref (n + kprev))
+          have hshift : idx.val - n < kprev := by omega
+          simp [Ref.inputMinor, Ref.eval, GateList.eval, GateList.inputMinor,
+            extendEnv, hinput, hprev, hshift] at ih' ⊢
+          simpa using ih'
+        · have hshift : ¬idx.val - n < kprev := by omega
+          simp [Ref.inputMinor, Ref.eval, GateList.eval, GateList.inputMinor,
+            extendEnv, hinput, hprev, hshift, hgate]
+
+/-- Evaluating an input-minor circuit equals evaluating the original circuit
+    after applying the literal substitution to the input environment. -/
+theorem Circuit.eval_inputMinor (c : Circuit n k) (ρ : Fin n → Ref m)
+    (input : Fin m → Bool) :
+    (c.inputMinor ρ).eval input = c.eval (fun i => (ρ i).eval input) := by
+  cases c with
+  | mk gates output =>
+    simpa [Circuit.inputMinor, Circuit.eval] using gateList_eval_inputMinor_ref gates ρ input output
+
+/-- A circuit for a function induces an equal-size circuit for every input minor. -/
+theorem HasCircuitOfSize.inputMinor {n m k : Nat} {f : (Fin n → Bool) → Bool}
+    (ρ : Fin n → Ref m) :
+    HasCircuitOfSize f k →
+      HasCircuitOfSize (fun input : Fin m → Bool => f (fun i => (ρ i).eval input)) k := by
+  rintro ⟨c, hc⟩
+  exact ⟨c.inputMinor ρ, fun input => by rw [Circuit.eval_inputMinor, hc]⟩
+
+/-- To rule out a circuit for `f`, it suffices to find a hard input minor of `f`. -/
+theorem noCircuitOfSize_of_inputMinor {n m k : Nat}
+    {f : (Fin n → Bool) → Bool} {g : (Fin m → Bool) → Bool}
+    (ρ : Fin n → Ref m)
+    (hminor : ∀ input, g input = f (fun i => (ρ i).eval input))
+    (hlower : ¬HasCircuitOfSize g k) :
+    ¬HasCircuitOfSize f k := by
+  intro hf
+  obtain ⟨c, hc⟩ := HasCircuitOfSize.inputMinor ρ hf
+  exact hlower ⟨c, fun input => by rw [hc input]; exact (hminor input).symm⟩
+
+-- ============================================================
+-- Last-gate decomposition
+-- ============================================================
+
+/-- A `(k+1)`-gate circuit either ignores the last gate, or computes the
+    final gate (possibly negated) from two functions already available from
+    the `k`-gate prefix. This is a structural way to reduce lower bounds from
+    size `k+1` to questions about which prefix outputs can coexist. -/
+theorem HasCircuitOfSize.succ_decompose {n k : Nat} {f : (Fin n → Bool) → Bool} :
+    HasCircuitOfSize f (k + 1) →
+      HasCircuitOfSize f k ∨
+        ∃ (g h : (Fin n → Bool) → Bool),
+          HasCircuitOfSize g k ∧ HasCircuitOfSize h k ∧
+            ((∀ x, f x = (g x && h x)) ∨
+             (∀ x, f x = !(g x && h x))) := by
+  rintro ⟨⟨gates, out⟩, hc⟩
+  match gates with
+  | .cons prev gate =>
+    obtain ⟨idx, neg⟩ := out
+    by_cases hprev : idx.val < n + k
+    · left
+      refine ⟨⟨prev, ⟨⟨idx.val, hprev⟩, neg⟩⟩, fun x => ?_⟩
+      calc
+        (⟨prev, ⟨⟨idx.val, hprev⟩, neg⟩⟩ : Circuit n k).eval x =
+            (⟨prev.cons gate, ⟨idx, neg⟩⟩ : Circuit n (k + 1)).eval x := by
+          cases neg <;>
+            simp [Circuit.eval, GateList.eval, Ref.eval, extendEnv, hprev]
+        _ = f x := hc x
+    · right
+      have hlast : idx.val = n + k := by
+        have := idx.isLt
+        omega
+      let g : (Fin n → Bool) → Bool := fun x => gate.lhs.eval (prev.eval x)
+      let h : (Fin n → Bool) → Bool := fun x => gate.rhs.eval (prev.eval x)
+      refine ⟨g, h, ?_, ?_, ?_⟩
+      · exact ⟨⟨prev, gate.lhs⟩, fun _ => rfl⟩
+      · exact ⟨⟨prev, gate.rhs⟩, fun _ => rfl⟩
+      · cases neg
+        · left
+          intro x
+          calc
+            f x = (⟨prev.cons gate, ⟨idx, false⟩⟩ : Circuit n (k + 1)).eval x :=
+              (hc x).symm
+            _ = (g x && h x) := by
+              simp [Circuit.eval, GateList.eval, Gate.eval, Ref.eval, extendEnv, hlast, g, h]
+        · right
+          intro x
+          calc
+            f x = (⟨prev.cons gate, ⟨idx, true⟩⟩ : Circuit n (k + 1)).eval x :=
+              (hc x).symm
+            _ = !(g x && h x) := by
+              cases hgl : gate.lhs.eval (prev.eval x) <;>
+                cases hgr : gate.rhs.eval (prev.eval x) <;>
+                simp [Circuit.eval, GateList.eval, Gate.eval, Ref.eval, extendEnv, hlast,
+                  g, h]
+
+/-- Contrapositive form of `HasCircuitOfSize.succ_decompose`, convenient for
+    lower bounds. To rule out size `k+1`, rule out size `k` and every possible
+    final AND/NAND decomposition over two `k`-gate-computable prefix outputs. -/
+theorem noCircuitOfSize_succ_of_no_decompose {n k : Nat}
+    {f : (Fin n → Bool) → Bool}
+    (hsmall : ¬HasCircuitOfSize f k)
+    (hdecomp : ∀ (g h : (Fin n → Bool) → Bool),
+      HasCircuitOfSize g k → HasCircuitOfSize h k →
+        ¬((∀ x, f x = (g x && h x)) ∨
+          (∀ x, f x = !(g x && h x)))) :
+    ¬HasCircuitOfSize f (k + 1) := by
+  intro hf
+  rcases HasCircuitOfSize.succ_decompose hf with hfsmall | hlast
+  · exact hsmall hfsmall
+  · rcases hlast with ⟨g, h, hg, hh, hcomb⟩
+    exact hdecomp g h hg hh hcomb
 
 -- ============================================================
 -- Size-0 lower bounds
@@ -295,6 +611,57 @@ theorem hasSize0_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
   · rintro ⟨idx, neg, h⟩
     refine ⟨⟨.nil, ⟨idx, neg⟩⟩, fun x => ?_⟩
     simp [Circuit.eval, Ref.eval, GateList.eval]
+    exact (h x).symm
+
+/-- A size-1 circuit is one AND gate over two input literals, followed by
+    an output reference to either an input wire or that gate output. -/
+theorem hasSize1_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
+    HasCircuitOfSize f 1 ↔
+      ∃ (li : Fin n) (ln : Bool) (ri : Fin n) (rn : Bool)
+        (oi : Fin (n + 1)) (on : Bool),
+        ∀ x, f x =
+          (⟨oi, on⟩ : Ref (n + 1)).eval
+            (extendEnv x ((⟨⟨li, ln⟩, ⟨ri, rn⟩⟩ : Gate n).eval x)) := by
+  constructor
+  · rintro ⟨⟨gates, out⟩, hc⟩
+    match gates with
+    | .cons .nil gate =>
+      obtain ⟨⟨li, ln⟩, ⟨ri, rn⟩⟩ := gate
+      obtain ⟨oi, on⟩ := out
+      refine ⟨li, ln, ri, rn, oi, on, fun x => ?_⟩
+      exact (hc x).symm
+  · rintro ⟨li, ln, ri, rn, oi, on, h⟩
+    refine ⟨⟨.cons .nil (⟨⟨li, ln⟩, ⟨ri, rn⟩⟩ : Gate n), ⟨oi, on⟩⟩, fun x => ?_⟩
+    exact (h x).symm
+
+/-- A size-2 circuit is two AND gates in topological order, followed by
+    an output reference to either an input wire or one of the two gates. -/
+theorem hasSize2_iff {n : Nat} {f : (Fin n → Bool) → Bool} :
+    HasCircuitOfSize f 2 ↔
+      ∃ (g0li : Fin n) (g0ln : Bool) (g0ri : Fin n) (g0rn : Bool)
+        (g1li : Fin (n + 1)) (g1ln : Bool) (g1ri : Fin (n + 1)) (g1rn : Bool)
+        (oi : Fin (n + 2)) (on : Bool),
+        ∀ x, f x =
+          (⟨oi, on⟩ : Ref (n + 2)).eval
+            (extendEnv
+              (extendEnv x
+                ((⟨⟨g0li, g0ln⟩, ⟨g0ri, g0rn⟩⟩ : Gate n).eval x))
+              ((⟨⟨g1li, g1ln⟩, ⟨g1ri, g1rn⟩⟩ : Gate (n + 1)).eval
+                (extendEnv x
+                  ((⟨⟨g0li, g0ln⟩, ⟨g0ri, g0rn⟩⟩ : Gate n).eval x)))) := by
+  constructor
+  · rintro ⟨⟨gates, out⟩, hc⟩
+    match gates with
+    | .cons (.cons .nil gate0) gate1 =>
+      obtain ⟨⟨g0li, g0ln⟩, ⟨g0ri, g0rn⟩⟩ := gate0
+      obtain ⟨⟨g1li, g1ln⟩, ⟨g1ri, g1rn⟩⟩ := gate1
+      obtain ⟨oi, on⟩ := out
+      refine ⟨g0li, g0ln, g0ri, g0rn, g1li, g1ln, g1ri, g1rn, oi, on, fun x => ?_⟩
+      exact (hc x).symm
+  · rintro ⟨g0li, g0ln, g0ri, g0rn, g1li, g1ln, g1ri, g1rn, oi, on, h⟩
+    let gate0 : Gate n := ⟨⟨g0li, g0ln⟩, ⟨g0ri, g0rn⟩⟩
+    let gate1 : Gate (n + 1) := ⟨⟨g1li, g1ln⟩, ⟨g1ri, g1rn⟩⟩
+    refine ⟨⟨.cons (.cons .nil gate0) gate1, ⟨oi, on⟩⟩, fun x => ?_⟩
     exact (h x).symm
 
 -- ============================================================
