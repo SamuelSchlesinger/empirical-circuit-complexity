@@ -602,18 +602,23 @@ private theorem finalCanOutput_size3 (g0 : Gate 3) (g1 : Gate 4) (g2 : Gate 5)
 private theorem f30_frontier_false : frontierCanOutput 2 0x1e#8 = false := by
   rfl
 
-private theorem f_30_no_size3 : ¬HasCircuitOfSize Size3.Defs0.f_30 3 := by
+/-- Generic size-3 lower bound via the frontier search.  If
+    `frontierCanOutput 2 mask = false` (i.e., no 3-gate circuit can produce the
+    bitvector `mask` over the canonical 8 inputs) and `f` agrees with `mask`
+    bit-by-bit on the canonical inputs, then `f` has no size-3 circuit. -/
+private theorem noSize3_of_frontier_false {f : (Fin 3 → Bool) → Bool}
+    (mask : BitVec 8)
+    (hf : ∀ bit (hbit : bit < 8),
+      f (inputOfBit bit) = mask.getLsbD bit)
+    (hfront : frontierCanOutput 2 mask = false) :
+    ¬HasCircuitOfSize f 3 := by
   rintro ⟨⟨gates, out⟩, hc⟩
   match gates with
   | .cons (.cons (.cons .nil g0) g1) g2 =>
-    have hmask : size3MaskFin g0 g1 g2 out = 0x1e#8 := by
+    have hmask : size3MaskFin g0 g1 g2 out = mask := by
       apply BitVec.eq_of_getLsbD_eq
       intro i hi
-      have hi' : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨
-          i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by omega
-      rcases hi' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-        rw [size3MaskFin_get g0 g1 g2 out _ (by omega), hc] <;>
-        simp [inputOfBit, inputMask, Size3.Defs0.f_30]
+      rw [size3MaskFin_get g0 g1 g2 out _ hi, hc, hf _ hi]
     have hstate : containsState
         (state2 (gateEvalMask g0 inputMask)
           (gateEvalMask g1 (extendEnvMask inputMask (gateEvalMask g0 inputMask))))
@@ -623,11 +628,21 @@ private theorem f_30_no_size3 : ¬HasCircuitOfSize Size3.Defs0.f_30 3 := by
         (state2 (gateEvalMask g0 inputMask)
           (gateEvalMask g1 (extendEnvMask inputMask (gateEvalMask g0 inputMask)))) = true := by
       simpa [size3MaskFin] using finalCanOutput_size3 g0 g1 g2 out
-    have hfront : frontierCanOutput 2 (size3MaskFin g0 g1 g2 out) = true :=
+    have hfront' : frontierCanOutput 2 (size3MaskFin g0 g1 g2 out) = true :=
       any_of_containsState hstate hfinal
-    rw [hmask] at hfront
-    rw [f30_frontier_false] at hfront
-    cases hfront
+    rw [hmask] at hfront'
+    rw [hfront] at hfront'
+    cases hfront'
+
+private theorem f_30_no_size3 : ¬HasCircuitOfSize Size3.Defs0.f_30 3 :=
+  noSize3_of_frontier_false (f := Size3.Defs0.f_30) 0x1e#8
+    (by
+      intro bit hbit
+      have hbit' : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨
+          bit = 4 ∨ bit = 5 ∨ bit = 6 ∨ bit = 7 := by omega
+      rcases hbit' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+        simp [inputOfBit, inputMask, Size3.Defs0.f_30])
+    f30_frontier_false
 
 -- f_0: truth table 0x0 — size 1
 
@@ -683,7 +698,14 @@ def f_6_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_6 j := by
       (by rw [hasSize2_iff_canon]; decide)
   else
     obtain rfl : j = 3 := by omega
-    sorry
+    exact noSize3_of_frontier_false (f := Size3.Defs0.f_6) 0x06#8
+      (by
+        intro bit hbit
+        have hbit' : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨
+            bit = 4 ∨ bit = 5 ∨ bit = 6 ∨ bit = 7 := by omega
+        rcases hbit' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+          simp [inputOfBit, inputMask, Size3.Defs0.f_6])
+      (by rfl)
 
 -- f_7: truth table 0x7 — size 2
 
@@ -730,7 +752,14 @@ def f_22_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_22 j := by
   else
     have : j = 3 ∨ j = 4 ∨ j = 5 := by omega
     rcases this with rfl | rfl | rfl
-    · sorry
+    · exact noSize3_of_frontier_false (f := Size3.Defs0.f_22) 0x16#8
+        (by
+          intro bit hbit
+          have hbit' : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨
+              bit = 4 ∨ bit = 5 ∨ bit = 6 ∨ bit = 7 := by omega
+          rcases hbit' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+            simp [inputOfBit, inputMask, Size3.Defs0.f_22])
+        (by rfl)
     · sorry
     · sorry
 
@@ -749,7 +778,14 @@ def f_23_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_23 j := by
       (by rw [hasSize2_iff_canon]; decide)
   else
     obtain rfl : j = 3 := by omega
-    sorry
+    exact noSize3_of_frontier_false (f := Size3.Defs0.f_23) 0x17#8
+      (by
+        intro bit hbit
+        have hbit' : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨
+            bit = 4 ∨ bit = 5 ∨ bit = 6 ∨ bit = 7 := by omega
+        rcases hbit' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+          simp [inputOfBit, inputMask, Size3.Defs0.f_23])
+      (by rfl)
 
 -- f_24: truth table 0x18 — size 5
 
@@ -771,7 +807,14 @@ def f_24_lower : ∀ j, j < 5 → ¬HasCircuitOfSize Size3.Defs0.f_24 j := by
   else
     have : j = 3 ∨ j = 4 := by omega
     rcases this with rfl | rfl
-    · sorry
+    · exact noSize3_of_frontier_false (f := Size3.Defs0.f_24) 0x18#8
+        (by
+          intro bit hbit
+          have hbit' : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨
+              bit = 4 ∨ bit = 5 ∨ bit = 6 ∨ bit = 7 := by omega
+          rcases hbit' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+            simp [inputOfBit, inputMask, Size3.Defs0.f_24])
+        (by rfl)
     · sorry
 
 -- f_25: truth table 0x19 — size 4
@@ -789,7 +832,14 @@ def f_25_lower : ∀ j, j < 4 → ¬HasCircuitOfSize Size3.Defs0.f_25 j := by
       (by rw [hasSize2_iff_canon]; decide)
   else
     obtain rfl : j = 3 := by omega
-    sorry
+    exact noSize3_of_frontier_false (f := Size3.Defs0.f_25) 0x19#8
+      (by
+        intro bit hbit
+        have hbit' : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨
+            bit = 4 ∨ bit = 5 ∨ bit = 6 ∨ bit = 7 := by omega
+        rcases hbit' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+          simp [inputOfBit, inputMask, Size3.Defs0.f_25])
+      (by rfl)
 
 -- f_27: truth table 0x1b — size 3
 
@@ -865,7 +915,14 @@ def f_105_lower : ∀ j, j < 6 → ¬HasCircuitOfSize Size3.Defs0.f_105 j := by
   else
     have : j = 3 ∨ j = 4 ∨ j = 5 := by omega
     rcases this with rfl | rfl | rfl
-    · sorry
+    · exact noSize3_of_frontier_false (f := Size3.Defs0.f_105) 0x69#8
+        (by
+          intro bit hbit
+          have hbit' : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨
+              bit = 4 ∨ bit = 5 ∨ bit = 6 ∨ bit = 7 := by omega
+          rcases hbit' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+            simp [inputOfBit, inputMask, Size3.Defs0.f_105])
+        (by rfl)
     · sorry
     · sorry
 
